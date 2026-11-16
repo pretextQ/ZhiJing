@@ -1,16 +1,22 @@
 from asyncio import Lock
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
-from .config import Settings
+from .config import Settings, StudySettings
 from .markdown import JAVA_TRIM
 from .polish import polish_events
+from .study import StudyStore, router as study_router
+
+FRONTEND = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
 class PolishRequest(BaseModel):
@@ -36,10 +42,11 @@ def error_result(code: int, message: str, status: int = 200) -> JSONResponse:
     return JSONResponse({"code": code, "msg": message, "data": None}, status_code=status)
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, study_settings: StudySettings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.settings = settings if settings is not None else Settings()
+        app.state.study = StudyStore(study_settings if study_settings is not None else StudySettings())
         app.state.polish_lock = Lock()
         async with httpx.AsyncClient() as client:
             app.state.model_client = client
@@ -49,6 +56,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, error: RequestValidationError):
+        if request.url.path != "/api/ai/polish-stream":
+            return await request_validation_exception_handler(request, error)
         problem = error.errors()[0]
         kind = problem["type"]
         if kind == "blank_text":
@@ -88,6 +97,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    app.include_router(study_router)
+    if (FRONTEND / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=FRONTEND / "assets"), name="study-assets")
+
+    @app.get("/", include_in_schema=False)
+    def study_room():
+        index = FRONTEND / "index.html"
+        if not index.is_file():
+            raise HTTPException(503, "请先运行 npm --prefix frontend run build")
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
     return app
 

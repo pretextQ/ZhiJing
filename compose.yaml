@@ -1,0 +1,20 @@
+services:
+  zhijing:
+    image: zhijing:local
+    build: .
+    pull_policy: build
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ZHIJING_DOCKER_PORT:-18119}:18081"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ZHIJING_STUDY_DATABASE: /data/study.sqlite3
+      ZHIJING_STUDY_OBSIDIAN_DIR: ""
+    volumes:
+      - study-data:/data
+
+volumes:
+  study-data:

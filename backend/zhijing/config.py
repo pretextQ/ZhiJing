@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Annotated
 
 from pydantic import Field, FiniteFloat, HttpUrl, PositiveInt, SecretStr
@@ -16,3 +17,12 @@ class Settings(BaseSettings):
     temperature: FiniteFloat = 0.4
     round_timeout: Annotated[FiniteFloat, Field(gt=0)] = 270
     min_chunk_time: Annotated[FiniteFloat, Field(ge=0)] = 30
+
+
+class StudySettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="ZHIJING_STUDY_", env_file=".env", extra="ignore", env_ignore_empty=True
+    )
+
+    database: Path = Path(".data/study.sqlite3")
+    obsidian_dir: Path | None = None
