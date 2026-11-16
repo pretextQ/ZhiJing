@@ -1,4 +1,5 @@
 import { computed, reactive, ref } from 'vue'
+import { readLocal, writeLocal } from './preferences'
 
 export interface LessonSummary {
   id: number
@@ -59,25 +60,6 @@ async function request<T>(path = '', method = 'GET', data?: object): Promise<T> 
     throw new RequestError(message, response.status)
   }
   return response.json()
-}
-
-export function readLocal<T>(key: string): T | null {
-  try {
-    const value = localStorage.getItem(`zhijing:${key}`)
-    return value ? JSON.parse(value) : null
-  } catch {
-    return null
-  }
-}
-
-export function writeLocal(key: string, value: unknown): boolean {
-  try {
-    if (value === null) localStorage.removeItem(`zhijing:${key}`)
-    else localStorage.setItem(`zhijing:${key}`, JSON.stringify(value))
-    return true
-  } catch {
-    return false
-  }
 }
 
 export function secondsFromInput(value: string): number | null {

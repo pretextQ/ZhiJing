@@ -103,6 +103,7 @@ def create_app(settings: Settings | None = None, study_settings: StudySettings |
         app.mount("/assets", StaticFiles(directory=FRONTEND / "assets"), name="study-assets")
 
     @app.get("/", include_in_schema=False)
+    @app.get("/courses", include_in_schema=False)
     def study_room():
         index = FRONTEND / "index.html"
         if not index.is_file():

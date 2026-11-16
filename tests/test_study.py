@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from zhijing.config import Settings, StudySettings
 from zhijing.main import create_app
-from zhijing import study
+from zhijing import main, study
 
 API = "/api/study"
 LOCAL = "http://127.0.0.1:18081"
@@ -134,3 +134,14 @@ def test_study_api_accepts_local_requests_and_rejects_other_web_origins(tmp_path
         payload = {"url": VIDEO}
         assert api.post(f"{API}/lessons", json=payload, headers={"Origin": "https://outside.example"}).status_code == 403
         assert api.post(f"{API}/lessons", json=payload, headers={"Origin": LOCAL}).status_code == 200
+
+
+def test_room_and_course_workspace_can_be_opened_directly(tmp_path: Path, monkeypatch):
+    frontend = tmp_path / "site"
+    frontend.mkdir()
+    frontend.joinpath("index.html").write_text("<title>合成自习室</title>", encoding="utf-8")
+    monkeypatch.setattr(main, "FRONTEND", frontend)
+    with client_at(tmp_path) as api:
+        for path in ("/", "/courses"):
+            assert api.get(path).text == "<title>合成自习室</title>"
+        assert api.get(API).status_code == 200

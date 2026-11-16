@@ -2,7 +2,7 @@
 import { ChevronDown, Headphones, ListMusic, Plus, Trash2, Volume2, VolumeX } from '@lucide/vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { type Track, readTracks, saveTracks } from './playlist'
-import { readLocal, writeLocal } from './study'
+import { readLocal, writeLocal } from './preferences'
 
 const noises = [
   { id: 'off', label: '静音' },
