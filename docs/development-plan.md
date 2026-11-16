@@ -70,11 +70,11 @@ my-study-room.zip
 
 ### 发布前检查
 
-- [ ] 六款内置主题都能预览和应用，刷新后恢复选中的场景。鼠标和键盘都能导入、预览、应用与关闭面板。
-- [ ] 合成 ZIP 能在 Docker 版导入。用同一数据卷重建容器后，主题仍可选，背景和可选音频仍可加载。
-- [ ] 无效 ZIP 给出原因，主题库和当前场景处于导入前的状态。
-- [ ] 首页的「看课笔记」入口和 `/courses` 直达都可用。分 P、续播点、笔记保存和 Obsidian 导出通过回归验收。
-- [ ] 记录六款内置素材的来源与再发布授权。GitHub 示例、截图、测试包和测试 Vault 使用合成数据。
+- [x] 六款内置主题都能预览和应用，刷新后恢复选中的场景。鼠标和键盘都能导入、预览、应用与关闭面板。
+- [x] 合成 ZIP 能在 Docker 版导入。用同一数据卷重建容器后，主题仍可选，背景和可选音频仍可加载。
+- [x] 无效 ZIP 给出原因，主题库和当前场景处于导入前的状态。
+- [x] 首页的「看课笔记」入口和 `/courses` 直达都可用。分 P、续播点、笔记保存和 Obsidian 导出通过回归验收。
+- [x] 记录六款内置素材的来源与再发布授权。GitHub 示例、截图、测试包和测试 Vault 使用合成数据。
 
 按 [本地启动说明](../README.md#本地启动) 准备依赖后，在仓库根目录运行前端构建和后端测试。
 
@@ -90,7 +90,7 @@ $env:ZHIJING_DOCKER_PORT = '18129'
 docker compose -f compose.yaml -p zhijing-theme-qa up -d --build --wait
 ```
 
-从本机 `http://127.0.0.1:18129/` 验收。导入合成 ZIP 后，重复运行上面的启动命令并加上 `--force-recreate`，确认同一数据卷可以恢复主题。验收结束后执行 `docker compose -f compose.yaml -p zhijing-theme-qa down`。
+从本机 `http://127.0.0.1:18129/` 验收。导入合成 ZIP 后，重复运行上面的启动命令并加上 `--force-recreate`，确认同一数据卷可以恢复主题。验收结束后执行 `docker compose -f compose.yaml -p zhijing-theme-qa down -v`。
 
 ## 五、后续路线
 
@@ -106,3 +106,45 @@ docker compose -f compose.yaml -p zhijing-theme-qa up -d --build --wait
 ## 可交给开发代理的第一条任务
 
 > 读取 `AGENTS.md` 和 `docs/development-plan.md`，完成第四节的「第一步 · 场景选择面板」。先检查现有主题 ID、首页场景入口和深浅色样式，再实现大图预览与应用。优先复用已有代码，保留专注计时和看课笔记的往返流程。使用合成数据检查桌面、320px 窄屏、键盘和刷新恢复。完成后列出改动、实际运行的验证命令和待补的场景素材。
+
+## 实施与验收记录（2026-11-16）
+
+在提交 `a8c2546` 基础上，按第四节的三个开发阶段完成场景与主题包开发，并勾选上节发布前检查。
+
+### 交付内容
+
+- 后端：[themes.py](../backend/zhijing/themes.py) 提供自定义主题导入、列表、素材读取与删除；[config.py](../backend/zhijing/config.py) 支持 `ZHIJING_STUDY_THEME_DIR`；[main.py](../backend/zhijing/main.py) 挂载路由。ZIP 32 MiB、展开 64 MiB、32 条目限制，校验清单、路径、符号链接、加密条目和素材魔数，暂存目录加原子发布，同包 sha256 去重。
+- 前端：[themes.ts](../frontend/src/themes.ts) 内置六款主题并封装接口，[App.vue](../frontend/src/App.vue) 实现 3/2/1 列场景面板、预览/应用/删除/导入与键盘焦点，[SoundPanel.vue](../frontend/src/SoundPanel.vue) 增加主题环境音，[styles.css](../frontend/src/styles.css) 覆盖 320px、深浅色和粘性操作栏。
+- 素材：[morning.jpg](../frontend/src/assets/morning.jpg)、[seaside.jpg](../frontend/src/assets/seaside.jpg)、[train.jpg](../frontend/src/assets/train.jpg)、[pixel.jpg](../frontend/src/assets/pixel.jpg)，由 [generate_theme_assets.py](../dev/generate_theme_assets.py) 生成的原创合成插画；来源与授权见 [场景与主题包](theme-packs.md)。
+- 测试与验收：[test_themes.py](../tests/test_themes.py) 新增 50 项用例；[verify_themes.py](../dev/verify_themes.py) 与 [verify_themes_docker.py](../dev/verify_themes_docker.py) 提供浏览器和 Docker 验收脚本。
+- 文档：[场景与主题包](theme-packs.md)、[README](../README.md)。
+
+### 实际验证
+
+```text
+uv run --locked --no-sync pytest -q
+  84 passed, 1 warning（原有 34 项 + 主题 50 项）
+
+npm.cmd --prefix frontend run build
+  vue-tsc --noEmit 通过；vite build 成功，dist 包含六张主题图
+
+$env:PYTHONPATH=(Resolve-Path .dev/browser-deps).Path
+uv run --locked --no-sync python dev/verify_themes.py
+  PASS：六款内置、预览/应用/刷新恢复、键盘、ZIP 导入/重复/无效包、320px、深色、
+        主题环境音播放、专注计时与课程草稿/撤销往返、删除回退雨窗
+
+uv run --locked --no-sync python dev/verify_themes_docker.py
+  PASS：独立项目 zhijing-theme-qa / 端口 18129 导入合成包，重建容器后同一数据卷
+        仍返回主题与素材；无效包 422；删除后主题库为空；结束执行 down -v
+
+$env:PYTHONPATH=(Resolve-Path .dev/browser-deps).Path
+uv run --locked --no-sync python .dev/verify_study_mvp.py
+  PASS：专注计时、导航、音频、场景、深浅色、320px、课程草稿/撤销与 Obsidian 导出
+```
+
+### 待验证与后续
+
+- 四张新增场景图是项目原创合成插画，可按 [场景与主题包](theme-packs.md) 替换为有授权的真实摄影；替换后重新构建前端即可。
+- 动态背景、主题包导出和主题库排序/重命名未在本次范围，保留在后续候选中。
+- 主题限制目前为代码常量，尚未做成用户可配置项。
+- 本机已存在的旧 `zhijing` 容器仍运行旧镜像；需要更新时在仓库根目录执行 `docker compose up -d --build`。
