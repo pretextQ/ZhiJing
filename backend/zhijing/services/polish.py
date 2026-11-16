@@ -6,7 +6,7 @@ from time import monotonic
 
 import httpx
 
-from .config import Settings
+from ..settings import Settings
 from .markdown import (
     JAVA_TRIM,
     JAVA_WHITESPACE,
@@ -15,7 +15,7 @@ from .markdown import (
     split_for_polish,
 )
 
-SKILLS = Path(__file__).with_name("skills")
+SKILLS = Path(__file__).resolve().parents[1] / "skills"
 POLISH_MATH = """【数学与代码保留规则】
 本次仅润色文字，已有 LaTeX 公式、公式分隔符、真实代码、命令、SQL、配置和日志逐字保留；不将数学公式改成代码或伪代码，不转换原代码，不补造或新增公式。"""
 FORMAT_MATH = r"""【数学表达与代码的选择】

@@ -4,9 +4,10 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from zhijing.config import Settings, StudySettings
+from zhijing.settings import Settings, StudySettings
 from zhijing.main import create_app
-from zhijing import main, study
+from zhijing import main
+from zhijing.services import study
 
 API = "/api/study"
 LOCAL = "http://127.0.0.1:18081"

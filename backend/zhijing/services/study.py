@@ -2,21 +2,26 @@ import hashlib
 import os
 import re
 import sqlite3
-from contextlib import closing, contextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from time import time_ns
-from typing import Annotated
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, Field, field_validator
+from fastapi import HTTPException
 
-from .config import StudySettings
+from ..domain.schemas import (
+    MAX_SECONDS,
+    Lesson,
+    LessonSummary,
+    LessonUpdate,
+    NoteUpdate,
+    OpenLink,
+    Revision,
+    Room,
+)
+from ..infra.db import Database
 
-router = APIRouter(prefix="/api/study", tags=["自习室"])
-MAX_SECONDS = 359999
 VIDEO_PATH = re.compile(r"/video/(BV[a-zA-Z0-9]{10}|av[0-9]{1,16})/?")
 COURSE_PATH = re.compile(r"/(?:cheese|bangumi)/play/(?:ep|ss)[0-9]{1,16}/?")
 SITE = "https://www.bilibili.com"
@@ -62,52 +67,6 @@ def read_source(url: str) -> tuple[str, int, int | None]:
     raise HTTPException(422, "找不到视频编号，请打开视频后复制地址")
 
 
-class OpenLink(BaseModel):
-    url: Annotated[str, Field(min_length=1, max_length=2048)]
-
-
-class LessonUpdate(BaseModel):
-    title: Annotated[str, Field(min_length=1, max_length=80)] | None = None
-    seconds: Annotated[int, Field(ge=0, le=MAX_SECONDS, strict=True)] | None = None
-
-    @field_validator("title")
-    @classmethod
-    def validate_title(cls, value: str | None) -> str | None:
-        if value is not None:
-            value = " ".join(value.split())
-            if not value:
-                raise ValueError("请输入课程名称")
-        return value
-
-
-class Revision(BaseModel):
-    revision: Annotated[int, Field(ge=0, strict=True)]
-
-
-class NoteUpdate(Revision):
-    markdown: Annotated[str, Field(max_length=200_000)]
-
-
-class LessonSummary(BaseModel):
-    id: int
-    title: str
-    part: int
-    seconds: int
-    original_url: str
-    embed_url: str | None
-
-
-class Lesson(LessonSummary):
-    markdown: str
-    revision: int
-
-
-class Room(BaseModel):
-    lessons: list[LessonSummary]
-    active: Lesson | None
-    obsidian_enabled: bool
-
-
 def lesson_summary(row: sqlite3.Row) -> LessonSummary:
     source, part = row["source"], row["part"]
     video = VIDEO_PATH.fullmatch(f"/{source}")
@@ -140,35 +99,27 @@ def check_revision(row: sqlite3.Row, revision: int) -> None:
         raise HTTPException(409, "这篇笔记已在另一窗口更新")
 
 
-class StudyStore:
-    def __init__(self, settings: StudySettings):
-        self.database = settings.database
-        self.obsidian_dir = settings.obsidian_dir
+def write_markdown(target: Path, data: bytes) -> None:
+    with NamedTemporaryFile(dir=target.parent, prefix=".zhijing-", delete=False) as draft:
+        path = Path(draft.name)
+        try:
+            draft.write(data)
+            draft.close()
+            os.replace(path, target)
+        finally:
+            draft.close()
+            path.unlink(missing_ok=True)
 
-    @contextmanager
-    def connect(self):
-        self.database.parent.mkdir(parents=True, exist_ok=True)
-        with closing(sqlite3.connect(self.database)) as conn, conn:
-            conn.row_factory = sqlite3.Row
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS lessons (
-                    id INTEGER PRIMARY KEY,
-                    source TEXT NOT NULL,
-                    part INTEGER NOT NULL,
-                    title TEXT NOT NULL,
-                    seconds INTEGER NOT NULL DEFAULT 0,
-                    opened_at INTEGER NOT NULL,
-                    markdown TEXT NOT NULL DEFAULT '',
-                    revision INTEGER NOT NULL DEFAULT 0,
-                    export_path TEXT,
-                    export_digest TEXT,
-                    UNIQUE (source, part)
-                )
-            """)
-            yield conn
+
+class StudyService:
+    """Course workspace use cases backed by the migrated SQLite database."""
+
+    def __init__(self, database: Database, obsidian_dir: Path | None):
+        self.database = database
+        self.obsidian_dir = obsidian_dir
 
     def room(self) -> Room:
-        with self.connect() as conn:
+        with self.database.connect() as conn:
             conn.execute("BEGIN")
             rows = conn.execute("""
                 SELECT id, source, part, title, seconds FROM lessons ORDER BY opened_at DESC, id DESC
@@ -183,7 +134,7 @@ class StudyStore:
     def open_link(self, payload: OpenLink) -> Lesson:
         source, part, seconds = read_source(payload.url)
         title = source.rsplit("/", 1)[-1]
-        with self.connect() as conn:
+        with self.database.connect() as conn:
             row = conn.execute("""
                 INSERT INTO lessons (source, part, title, seconds, opened_at) VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT (source, part) DO UPDATE SET
@@ -193,7 +144,7 @@ class StudyStore:
             return as_lesson(row)
 
     def reopen(self, lesson_id: int) -> Lesson:
-        with self.connect() as conn:
+        with self.database.connect() as conn:
             row = conn.execute(
                 "UPDATE lessons SET opened_at = ? WHERE id = ? RETURNING *", (time_ns(), lesson_id)
             ).fetchone()
@@ -202,7 +153,7 @@ class StudyStore:
             return as_lesson(row)
 
     def update(self, lesson_id: int, payload: LessonUpdate) -> LessonSummary:
-        with self.connect() as conn:
+        with self.database.connect() as conn:
             conn.execute("""
                 UPDATE lessons SET title = coalesce(?, title), seconds = coalesce(?, seconds)
                 WHERE id = ?
@@ -210,11 +161,11 @@ class StudyStore:
             return lesson_summary(selected(conn, lesson_id))
 
     def lesson(self, lesson_id: int) -> Lesson:
-        with self.connect() as conn:
+        with self.database.connect() as conn:
             return as_lesson(selected(conn, lesson_id))
 
     def save_note(self, lesson_id: int, payload: NoteUpdate) -> Revision:
-        with self.connect() as conn:
+        with self.database.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = selected(conn, lesson_id)
             if row["markdown"] == payload.markdown:
@@ -230,7 +181,7 @@ class StudyStore:
     def export(self, lesson_id: int, payload: Revision) -> str:
         if self.obsidian_dir is None:
             raise HTTPException(409, "请先在 .env 配置 Obsidian 目标目录")
-        with self.connect() as conn:
+        with self.database.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = selected(conn, lesson_id)
             check_revision(row, payload.revision)
@@ -259,63 +210,3 @@ class StudyStore:
                 (str(target), digest, lesson_id),
             )
             return filename
-
-
-def write_markdown(target: Path, data: bytes) -> None:
-    with NamedTemporaryFile(dir=target.parent, prefix=".zhijing-", delete=False) as draft:
-        path = Path(draft.name)
-        try:
-            draft.write(data)
-            draft.close()
-            os.replace(path, target)
-        finally:
-            draft.close()
-            path.unlink(missing_ok=True)
-
-
-def store_for(request: Request, response: Response) -> StudyStore:
-    if request.url.hostname not in {"localhost", "127.0.0.1", "::1"}:
-        raise HTTPException(403, "自习室 API 只能通过本机地址访问")
-    origin = request.headers.get("origin")
-    if origin and origin != f"{request.url.scheme}://{request.url.netloc}":
-        raise HTTPException(403, "请从知径页面操作")
-    response.headers["Cache-Control"] = "no-store"
-    return request.app.state.study
-
-
-Store = Annotated[StudyStore, Depends(store_for)]
-
-
-@router.get("")
-def room(store: Store) -> Room:
-    return store.room()
-
-
-@router.post("/lessons")
-def open_link(payload: OpenLink, store: Store) -> Lesson:
-    return store.open_link(payload)
-
-
-@router.post("/lessons/{lesson_id}/open")
-def reopen(lesson_id: int, store: Store) -> Lesson:
-    return store.reopen(lesson_id)
-
-
-@router.patch("/lessons/{lesson_id}")
-def update(lesson_id: int, payload: LessonUpdate, store: Store) -> LessonSummary:
-    return store.update(lesson_id, payload)
-
-
-@router.get("/lessons/{lesson_id}")
-def lesson(lesson_id: int, store: Store) -> Lesson:
-    return store.lesson(lesson_id)
-
-
-@router.put("/lessons/{lesson_id}/note")
-def save_note(lesson_id: int, payload: NoteUpdate, store: Store) -> Revision:
-    return store.save_note(lesson_id, payload)
-
-
-@router.post("/lessons/{lesson_id}/export")
-def export(lesson_id: int, payload: Revision, store: Store) -> dict[str, str]:
-    return {"filename": store.export(lesson_id, payload)}

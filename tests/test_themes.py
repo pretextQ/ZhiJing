@@ -13,9 +13,9 @@ from urllib.parse import quote, unquote
 import pytest
 from fastapi.testclient import TestClient
 
-from zhijing.config import Settings, StudySettings
+from zhijing.settings import Settings, StudySettings
 from zhijing.main import create_app
-from zhijing.themes import ThemeStore
+from zhijing.services.themes import ThemeService
 
 API = "/api/study/themes"
 LOCAL = "http://127.0.0.1:18081"
@@ -538,10 +538,10 @@ def test_theme_dir_injection_and_default_root(tmp_path: Path):
     default_root = tmp_path / "state" / "themes"
     assert (default_root / card["id"] / MANIFEST).is_file()
 
-    assert ThemeStore(StudySettings(_env_file=None, database=tmp_path / "db" / "study.db")).root == (
+    assert ThemeService(StudySettings(_env_file=None, database=tmp_path / "db" / "study.db")).root == (
         tmp_path / "db" / "themes"
     )
-    assert ThemeStore(
+    assert ThemeService(
         StudySettings(_env_file=None, database=tmp_path / "db" / "study.db", theme_dir=injected)
     ).root == injected
 
@@ -567,7 +567,7 @@ def test_failed_import_leaves_no_partial_theme(tmp_path: Path):
 
 
 def test_concurrent_identical_imports_publish_one_theme(tmp_path: Path):
-    store = ThemeStore(
+    store = ThemeService(
         StudySettings(
             _env_file=None,
             database=tmp_path / "state" / "study.db",
@@ -841,7 +841,7 @@ def test_limits_follow_settings_and_environment(tmp_path: Path, monkeypatch):
 
 
 def test_store_uses_configured_limits(tmp_path: Path):
-    store = ThemeStore(
+    store = ThemeService(
         StudySettings(
             _env_file=None,
             database=tmp_path / "db" / "study.db",

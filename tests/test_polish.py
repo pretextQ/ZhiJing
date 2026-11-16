@@ -5,10 +5,10 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from zhijing.config import Settings
+from zhijing.settings import Settings, StudySettings
 from zhijing.main import create_app
-from zhijing.markdown import complete_fragment, split_for_polish
-from zhijing.polish import INCOMPLETE, TIMEOUT
+from zhijing.services.markdown import complete_fragment, split_for_polish
+from zhijing.services.polish import INCOMPLETE, TIMEOUT
 
 ENDPOINT = "/api/ai/polish-stream"
 NOTE = "## 合成笔记\n\n这里是一段供接口验收使用的合成原句。"
@@ -30,7 +30,7 @@ def events(response):
 
 
 @pytest.fixture
-def open_api(monkeypatch):
+def open_api(monkeypatch, tmp_path):
     original = httpx.AsyncClient
 
     def create(handler, **overrides):
@@ -48,7 +48,8 @@ def open_api(monkeypatch):
                         "min_chunk_time": 0,
                         **overrides,
                     },
-                )
+                ),
+                StudySettings(_env_file=None, database=tmp_path / "state" / "study.db"),
             )
         )
 

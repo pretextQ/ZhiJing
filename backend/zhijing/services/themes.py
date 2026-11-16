@@ -10,14 +10,12 @@ import zipfile
 from dataclasses import dataclass, replace
 from pathlib import Path
 from tempfile import mkdtemp, mkstemp
-from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from fastapi import HTTPException
 
-from .config import StudySettings
+from ..domain.schemas import ThemeCard, ThemeLimits
+from ..settings import StudySettings
 
 PREFIX = "/api/study/themes"
 THEME_ID = re.compile(r"[0-9a-f]{12}")
@@ -41,23 +39,6 @@ AUDIO_TYPES = {"mp3": "audio/mpeg", "ogg": "audio/ogg"}
 UNSUPPORTED_IMAGE_SUFFIXES = {"gif", "bmp", "svg", "avif"}
 UNSUPPORTED_VIDEO_SUFFIXES = {"mov", "avi", "mkv", "flv", "m4v", "wmv"}
 UNSUPPORTED_AUDIO_SUFFIXES = {"wav", "flac", "m4a", "aac"}
-
-router = APIRouter(prefix=PREFIX, tags=["自习室"])
-
-
-class ThemeCard(BaseModel):
-    id: str
-    name: str
-    cover_url: str
-    background_url: str
-    ambient_url: str | None
-    background_video_url: str | None
-
-
-class ThemeLimits(BaseModel):
-    max_archive_mb: int
-    max_expanded_mb: int
-    max_entries: int
 
 
 @dataclass(frozen=True)
@@ -345,9 +326,11 @@ def content_disposition(name: str) -> str:
     return f'attachment; filename="{fallback}.zip"; filename*=UTF-8\'\'{encoded}'
 
 
-class ThemeStore:
+class ThemeService:
+    """Imported theme pack library stored under the configured theme root."""
+
     def __init__(self, settings: StudySettings):
-        self.root = settings.theme_dir if settings.theme_dir is not None else settings.database.parent / "themes"
+        self.root = settings.theme_root
         self.max_archive_mb = settings.theme_max_archive_mb
         self.max_expanded_mb = settings.theme_max_expanded_mb
         self.max_entries = settings.theme_max_entries
@@ -514,77 +497,3 @@ class ThemeStore:
             if target.is_symlink() or not target.is_file():
                 raise HTTPException(404, "找不到这个素材")
             return target, allowed[asset_path]
-
-
-def require_local(request: Request, response: Response) -> ThemeStore:
-    if request.url.hostname not in {"localhost", "127.0.0.1", "::1"}:
-        raise HTTPException(403, "自习室 API 只能通过本机地址访问")
-    origin = request.headers.get("origin")
-    if origin and origin != f"{request.url.scheme}://{request.url.netloc}":
-        raise HTTPException(403, "请从知径页面操作")
-    response.headers["Cache-Control"] = "no-store"
-    return request.app.state.themes
-
-
-Store = Annotated[ThemeStore, Depends(require_local)]
-
-
-async def read_upload(request: Request, store: ThemeStore) -> bytes:
-    limit = store.max_archive_bytes
-    body = bytearray()
-    async for chunk in request.stream():
-        body.extend(chunk)
-        if len(body) > limit:
-            raise HTTPException(413, f"主题包不能超过 {size_text(limit)}")
-    if not body:
-        raise HTTPException(422, "主题包不能为空")
-    return bytes(body)
-
-
-@router.get("")
-def list_themes(store: Store) -> list[ThemeCard]:
-    return store.cards()
-
-
-@router.get("/limits")
-def theme_limits(store: Store) -> ThemeLimits:
-    return store.limits()
-
-
-@router.post("")
-async def import_theme(request: Request, store: Store) -> ThemeCard:
-    return store.import_archive(await read_upload(request, store))
-
-
-@router.patch("/{theme_id}")
-def rename_theme(theme_id: str, payload: dict, store: Store) -> ThemeCard:
-    return store.rename(theme_id, payload.get("name"))
-
-
-@router.get("/{theme_id}/export")
-def export_theme(theme_id: str, store: Store) -> Response:
-    name, archive = store.export(theme_id)
-    return Response(
-        content=archive,
-        media_type="application/zip",
-        headers={
-            "Content-Disposition": content_disposition(name),
-            "X-Content-Type-Options": "nosniff",
-            "Cache-Control": "no-store",
-        },
-    )
-
-
-@router.delete("/{theme_id}", status_code=204)
-def delete_theme(theme_id: str, store: Store) -> None:
-    store.delete(theme_id)
-
-
-@router.get("/{theme_id}/assets/{asset_path:path}")
-def theme_asset(theme_id: str, asset_path: str, store: Store) -> FileResponse:
-    target, kind = store.asset(theme_id, asset_path)
-    return FileResponse(
-        target,
-        media_type=kind,
-        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "no-store"},
-    )
