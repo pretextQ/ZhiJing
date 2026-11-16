@@ -1,29 +1,14 @@
-import { computed, reactive, ref } from 'vue'
+import { RequestError } from './api/http'
+import type { LessonDto, LessonSummaryDto, RoomDto } from './api/types'
 import { readLocal, writeLocal } from './preferences'
 
-export interface LessonSummary {
-  id: number
-  title: string
-  part: number
-  seconds: number
-  original_url: string
-  embed_url: string | null
-}
+export type LessonSummary = LessonSummaryDto
+export type Lesson = LessonDto
+export type Room = RoomDto
 
-interface Lesson extends LessonSummary {
-  markdown: string
-  revision: number
-}
+export type SaveStatus = 'saved' | 'pending' | 'saving' | 'offline' | 'conflict'
 
-interface Room {
-  lessons: LessonSummary[]
-  active: Lesson | null
-  obsidian_enabled: boolean
-}
-
-type SaveStatus = 'saved' | 'pending' | 'saving' | 'offline' | 'conflict'
-
-interface Draft {
+export interface Draft {
   key: string
   text: string
   savedText: string
@@ -33,33 +18,10 @@ interface Draft {
   submitted?: string
 }
 
-interface DraftCopy {
+export interface DraftCopy {
   revision: number
   text: string
   submitted?: string
-}
-
-const API = '/api/study'
-
-class RequestError extends Error {
-  constructor(message: string, readonly status: number) {
-    super(message)
-  }
-}
-
-async function request<T>(path = '', method = 'GET', data?: object): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
-    method,
-    cache: 'no-store',
-    headers: data ? { 'Content-Type': 'application/json' } : undefined,
-    body: data ? JSON.stringify(data) : undefined,
-  })
-  if (!response.ok) {
-    const body = await response.json().catch(() => null)
-    const message = typeof body?.detail === 'string' ? body.detail : '请求失败，请检查输入后重试'
-    throw new RequestError(message, response.status)
-  }
-  return response.json()
 }
 
 export function secondsFromInput(value: string): number | null {
@@ -117,146 +79,13 @@ export function messageFor(error: unknown): string {
   return error instanceof RequestError ? error.message : '无法连接知径，请确认本地服务正在运行'
 }
 
-export function useStudy() {
-  const lessons = ref<LessonSummary[]>([])
-  const active = ref<LessonSummary | null>(null)
-  const obsidianEnabled = ref(false)
-  const drafts = reactive(new Map<number, Draft>())
-  const draft = computed(() => active.value ? drafts.get(active.value.id) : undefined)
-  const timers = new Map<number, number>()
-  const writes = new Map<number, Promise<boolean>>()
+export function persistDraftCopy(note: Draft): boolean {
+  const clean = note.text === note.savedText && note.submitted === undefined
+  const copy: DraftCopy | null = clean ? null : { text: note.text, revision: note.revision, submitted: note.submitted }
+  note.cached = writeLocal(note.key, copy)
+  return note.cached
+}
 
-  function cache(note: Draft) {
-    const clean = note.text === note.savedText && note.submitted === undefined
-    const copy = clean ? null : { text: note.text, revision: note.revision, submitted: note.submitted }
-    note.cached = writeLocal(note.key, copy)
-  }
-
-  function clearTimer(lessonId: number) {
-    window.clearTimeout(timers.get(lessonId))
-    timers.delete(lessonId)
-  }
-
-  function flush(lessonId: number): Promise<boolean> {
-    clearTimer(lessonId)
-    const inProgress = writes.get(lessonId)
-    if (inProgress) return inProgress
-    const note = drafts.get(lessonId)
-    if (!note || note.status === 'conflict') return Promise.resolve(false)
-    const save = async () => {
-      while (note.text !== note.savedText) {
-        const markdown = note.text
-        note.status = 'saving'
-        note.submitted = markdown
-        cache(note)
-        try {
-          const result = await request<{ revision: number }>(
-            `/lessons/${lessonId}/note`, 'PUT', { markdown, revision: note.revision },
-          )
-          note.revision = result.revision
-          note.savedText = markdown
-          note.submitted = undefined
-          cache(note)
-        } catch (error) {
-          note.status = error instanceof RequestError && error.status === 409 ? 'conflict' : 'offline'
-          return false
-        }
-      }
-      note.status = 'saved'
-      note.submitted = undefined
-      cache(note)
-      return true
-    }
-    const pending = save().finally(() => writes.delete(lessonId))
-    writes.set(lessonId, pending)
-    return pending
-  }
-
-  function schedule(lessonId: number) {
-    clearTimer(lessonId)
-    timers.set(lessonId, window.setTimeout(() => void flush(lessonId), 350))
-  }
-
-  function edit(lessonId: number, text: string) {
-    const note = drafts.get(lessonId)
-    if (!note) return
-    note.text = text
-    cache(note)
-    if (note.status !== 'conflict') {
-      if (!writes.has(lessonId)) note.status = text === note.savedText ? 'saved' : 'pending'
-      schedule(lessonId)
-    }
-  }
-
-  function activate(lesson: Lesson) {
-    const previous = active.value
-    if (previous && previous.id !== lesson.id) void flush(previous.id)
-    if (!drafts.has(lesson.id)) {
-      const key = `draft:${lesson.original_url}`
-      const copy = readLocal<DraftCopy>(key)
-      const hasCopy = typeof copy?.text === 'string' && typeof copy.revision === 'number'
-      const text = hasCopy ? copy.text : lesson.markdown
-      const recovered = text !== lesson.markdown
-      const acknowledged = copy?.submitted === lesson.markdown && copy.revision + 1 === lesson.revision
-      const conflict = recovered && hasCopy && copy.revision !== lesson.revision && !acknowledged
-      drafts.set(lesson.id, {
-        key, text, savedText: lesson.markdown, revision: lesson.revision,
-        status: conflict ? 'conflict' : recovered ? 'pending' : 'saved', cached: true,
-      })
-      if (recovered && !conflict) schedule(lesson.id)
-      if (!recovered && hasCopy) writeLocal(key, null)
-    }
-    const { markdown: _markdown, revision: _revision, ...summary } = lesson
-    active.value = summary
-    lessons.value = [summary, ...lessons.value.filter(item => item.id !== lesson.id)]
-    return summary
-  }
-
-  async function load() {
-    const room = await request<Room>()
-    lessons.value = room.lessons
-    obsidianEnabled.value = room.obsidian_enabled
-    if (room.active) return activate(room.active)
-    return null
-  }
-
-  async function open(url: string) {
-    return activate(await request<Lesson>('/lessons', 'POST', { url }))
-  }
-
-  async function reopen(lessonId: number) {
-    return activate(await request<Lesson>(`/lessons/${lessonId}/open`, 'POST'))
-  }
-
-  async function update(lessonId: number, details: { title?: string; seconds?: number }) {
-    const lesson = await request<LessonSummary>(`/lessons/${lessonId}`, 'PATCH', details)
-    lessons.value = lessons.value.map(item => item.id === lessonId ? lesson : item)
-    if (active.value?.id === lessonId) active.value = lesson
-    return lesson
-  }
-
-  async function restore(lessonId: number) {
-    const note = drafts.get(lessonId)
-    if (!note) return null
-    const before = note.text
-    const latest = await request<Lesson>(`/lessons/${lessonId}`)
-    if (note.text !== before) return null
-    note.text = latest.markdown
-    note.savedText = latest.markdown
-    note.revision = latest.revision
-    note.status = 'saved'
-    note.submitted = undefined
-    cache(note)
-    return latest.markdown
-  }
-
-  async function exportNote(lessonId: number) {
-    const note = drafts.get(lessonId)
-    if (!note || !await flush(lessonId)) {
-      throw new RequestError('保存笔记后才能写入 Obsidian，可先下载当前草稿', 409)
-    }
-    return request<{ filename: string }>(`/lessons/${lessonId}/export`, 'POST', { revision: note.revision })
-  }
-
-  return { lessons, active, obsidianEnabled, draft, load, open, reopen, update, edit, flush, restore, exportNote }
+export function readDraftCopy(key: string): DraftCopy | null {
+  return readLocal<DraftCopy>(key)
 }

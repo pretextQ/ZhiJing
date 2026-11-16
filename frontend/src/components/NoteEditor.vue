@@ -25,24 +25,41 @@ function makeState(doc: string) {
       EditorView.contentAttributes.of({ 'aria-label': '课程笔记', spellcheck: 'false' }),
       placeholder('用 Markdown 记录疑问、要点和自己的理解…'),
       keymap.of([
-        { key: 'Alt-t', run: () => { emit('timestamp'); return true } },
-        { key: 'Mod-s', run: () => { emit('save'); return true } },
+        {
+          key: 'Alt-t',
+          run: () => {
+            emit('timestamp')
+            return true
+          },
+        },
+        {
+          key: 'Mod-s',
+          run: () => {
+            emit('save')
+            return true
+          },
+        },
         ...historyKeymap,
         ...defaultKeymap,
       ]),
-      EditorView.updateListener.of(update => {
+      EditorView.updateListener.of((update) => {
         if (update.docChanged) emit('edit', props.lessonId, update.state.doc.toString())
       }),
     ],
   })
 }
 
-onMounted(() => { view = new EditorView({ state: makeState(props.initialText), parent: host.value }) })
-onBeforeUnmount(() => view.destroy())
-watch(() => props.lessonId, (id, previousId) => {
-  states.set(previousId, view.state)
-  view.setState(states.get(id) ?? makeState(props.initialText))
+onMounted(() => {
+  view = new EditorView({ state: makeState(props.initialText), parent: host.value })
 })
+onBeforeUnmount(() => view.destroy())
+watch(
+  () => props.lessonId,
+  (id, previousId) => {
+    states.set(previousId, view.state)
+    view.setState(states.get(id) ?? makeState(props.initialText))
+  },
+)
 
 function insert(text: string) {
   view.dispatch({

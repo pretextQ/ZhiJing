@@ -1,0 +1,40 @@
+:root {
+  font-family: 'Inter', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+  color-scheme: light;
+  --page: #f3f5ef;
+  --paper: #fffefa;
+  --surface: #f3f5ef;
+  --surface-hover: #e9eee6;
+  --line: #dde4d9;
+  --text: #202e28;
+  --muted: #55665d;
+  --accent: #186150;
+  --accent-hover: #124d3f;
+  --accent-soft: #e4efe7;
+  --on-accent: #fff;
+  --error: #9c3428;
+  --focus: #237e6a;
+  --shadow: 0 2px 6px #20352a07, 0 13px 38px #20352a06;
+  background: var(--page);
+  color: var(--text);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page: #151b18;
+  --paper: #1c2520;
+  --surface: #242f28;
+  --surface-hover: #2d3b32;
+  --line: #354139;
+  --text: #e9efe9;
+  --muted: #b4c4b9;
+  --accent: #a3dbc5;
+  --accent-hover: #b9e9d6;
+  --accent-soft: #2a4135;
+  --on-accent: #10271e;
+  --error: #ffb4a7;
+  --focus: #a1d9c3;
+  --shadow: 0 6px 25px #0002;
+}

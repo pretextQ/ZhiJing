@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Pause, Play, RotateCcw } from '@lucide/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { readLocal, writeLocal } from './preferences'
-import { formatTime } from './study'
+import { readLocal, writeLocal } from '../preferences'
+import { formatTime } from '../study'
 
 interface Session {
   minutes: number
@@ -15,8 +15,11 @@ const saved = readLocal<Session>('focus-session')
 const minutes = ref(saved && validDuration(saved.minutes) ? saved.minutes : 25)
 const duration = computed(() => minutes.value * 60_000)
 const restoredRemaining = saved?.remaining
-const remaining = ref(typeof restoredRemaining === 'number' && Number.isFinite(restoredRemaining)
-  ? Math.min(duration.value, Math.max(0, restoredRemaining)) : duration.value)
+const remaining = ref(
+  typeof restoredRemaining === 'number' && Number.isFinite(restoredRemaining)
+    ? Math.min(duration.value, Math.max(0, restoredRemaining))
+    : duration.value,
+)
 const deadline = ref(saved && Number.isFinite(saved.deadline) ? saved.deadline : null)
 const goal = ref(typeof saved?.goal === 'string' ? saved.goal : '')
 const running = computed(() => deadline.value !== null)
@@ -29,7 +32,10 @@ function validDuration(value: number) {
 
 function persist() {
   writeLocal('focus-session', {
-    minutes: minutes.value, remaining: remaining.value, deadline: deadline.value, goal: goal.value,
+    minutes: minutes.value,
+    remaining: remaining.value,
+    deadline: deadline.value,
+    goal: goal.value,
   } satisfies Session)
 }
 
@@ -71,10 +77,14 @@ function reset() {
 }
 
 watch(goal, persist, { flush: 'sync' })
-watch(running, active => {
-  window.clearInterval(interval)
-  interval = active ? window.setInterval(refresh, 250) : undefined
-}, { immediate: true })
+watch(
+  running,
+  (active) => {
+    window.clearInterval(interval)
+    interval = active ? window.setInterval(refresh, 250) : undefined
+  },
+  { immediate: true },
+)
 onMounted(refresh)
 onUnmounted(() => window.clearInterval(interval))
 </script>
@@ -83,7 +93,7 @@ onUnmounted(() => window.clearInterval(interval))
   <section class="focus-session" aria-labelledby="room-title">
     <h1 id="room-title" tabindex="-1">自习室</h1>
     <div class="focus-clock" role="timer" aria-label="专注剩余时间">{{ time }}</div>
-    <input v-model="goal" type="text" maxlength="120" aria-label="本轮目标" placeholder="这一轮想完成什么？">
+    <input v-model="goal" type="text" maxlength="120" aria-label="本轮目标" placeholder="这一轮想完成什么？" />
     <div class="focus-timer-actions">
       <button type="button" class="focus-start" @click="toggle">
         <Pause v-if="running" :size="18" aria-hidden="true" />
@@ -97,7 +107,9 @@ onUnmounted(() => window.clearInterval(interval))
         aria-label="重置计时"
         :disabled="remaining === duration && !running"
         @click="reset"
-      ><RotateCcw :size="18" aria-hidden="true" /></button>
+      >
+        <RotateCcw :size="18" aria-hidden="true" />
+      </button>
       <label class="focus-duration focus-glass">
         <input
           type="number"
@@ -108,7 +120,7 @@ onUnmounted(() => window.clearInterval(interval))
           :disabled="running"
           :value="minutes"
           @change="changeDuration"
-        >
+        />
         <span aria-hidden="true">分钟</span>
       </label>
     </div>

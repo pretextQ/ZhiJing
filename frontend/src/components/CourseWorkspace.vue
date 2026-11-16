@@ -1,20 +1,41 @@
 <script setup lang="ts">
 import {
-  ArrowDownToLine, ArrowDownRight, ArrowRight, ArrowUpRight, BookOpen, Check, ChevronDown,
-  CircleHelp, Clock3, ExternalLink, Link, PencilLine, Play, Save, Video,
+  ArrowDownToLine,
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  BookOpen,
+  Check,
+  ChevronDown,
+  CircleHelp,
+  Clock3,
+  ExternalLink,
+  Link,
+  PencilLine,
+  Play,
+  Save,
+  Video,
 } from '@lucide/vue'
+import { storeToRefs } from 'pinia'
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import {
-  type LessonSummary, downloadNote, formatTime, messageFor, noteTimes, playerAt,
-  secondsFromInput, sourceAt, useStudy,
-} from './study'
+  type LessonSummary,
+  downloadNote,
+  formatTime,
+  messageFor,
+  noteTimes,
+  playerAt,
+  secondsFromInput,
+  sourceAt,
+} from '../study'
+import { useStudy } from '../stores/study'
 
 const props = defineProps<{ visible: boolean }>()
 const NoteEditor = defineAsyncComponent(() => import('./NoteEditor.vue'))
 
-const {
-  lessons, active, obsidianEnabled, draft, load, open, reopen, update, edit, flush, restore, exportNote,
-} = useStudy()
+const study = useStudy()
+const { lessons, active, obsidianEnabled, draft } = storeToRefs(study)
+const { load, open, reopen, update, edit, flush, restore, exportNote } = study
 const editor = ref<InstanceType<typeof NoteEditor>>()
 const courseUrl = ref('')
 const timeInput = ref('')
@@ -29,16 +50,22 @@ const noteMessage = ref('')
 const stampError = ref('')
 const playerUrl = ref<string | null>(null)
 const playerInstance = ref(0)
-const bookmarked = computed(() => active.value ? formatTime(active.value.seconds) : '00:00')
-const timestamps = computed(() => active.value && draft.value ? noteTimes(active.value, draft.value.text) : [])
+const bookmarked = computed(() => (active.value ? formatTime(active.value.seconds) : '00:00'))
+const timestamps = computed(() => (active.value && draft.value ? noteTimes(active.value, draft.value.text) : []))
 const noteStatus = computed(() => {
   switch (draft.value?.status) {
-    case 'saved': return '已保存'
-    case 'pending': return '待保存'
-    case 'saving': return '保存中'
-    case 'offline': return draft.value.cached ? '草稿留在浏览器，可重试' : '未保存，请重试或下载'
-    case 'conflict': return '另一窗口已保存新版'
-    default: return ''
+    case 'saved':
+      return '已保存'
+    case 'pending':
+      return '待保存'
+    case 'saving':
+      return '保存中'
+    case 'offline':
+      return draft.value.cached ? '草稿留在浏览器，可重试' : '未保存，请重试或下载'
+    case 'conflict':
+      return '另一窗口已保存新版'
+    default:
+      return ''
   }
 })
 
@@ -47,13 +74,16 @@ function seek(lesson: LessonSummary, seconds: number, play: boolean) {
   ++playerInstance.value
 }
 
-watch(() => props.visible, visible => {
-  const lesson = active.value
-  if (!visible && lesson) {
-    seek(lesson, lesson.seconds, false)
-    void flush(lesson.id)
-  }
-})
+watch(
+  () => props.visible,
+  (visible) => {
+    const lesson = active.value
+    if (!visible && lesson) {
+      seek(lesson, lesson.seconds, false)
+      void flush(lesson.id)
+    }
+  },
+)
 
 function showLesson(lesson: LessonSummary) {
   timeInput.value = ''
@@ -94,7 +124,7 @@ async function openLesson(action: () => Promise<LessonSummary>) {
 
 async function addLesson() {
   const url = courseUrl.value.trim()
-  if (url && await openLesson(() => open(url))) courseUrl.value = ''
+  if (url && (await openLesson(() => open(url)))) courseUrl.value = ''
 }
 
 async function chooseLesson(event: Event) {
@@ -198,7 +228,9 @@ async function restoreDraft() {
         type="button"
         class="quiet-button"
         @click="seek(active, active.seconds, true)"
-      ><Play :size="15" aria-hidden="true" /> 从 {{ bookmarked }} 继续</button>
+      >
+        <Play :size="15" aria-hidden="true" /> 从 {{ bookmarked }} 继续
+      </button>
     </div>
     <div class="workspace">
       <section class="panel course-panel" aria-labelledby="course-heading">
@@ -227,7 +259,7 @@ async function restoreDraft() {
               aria-label="B 站视频链接"
               placeholder="粘贴 B 站视频链接"
               required
-            >
+            />
           </label>
           <button type="submit" class="primary-button" :disabled="loading || switching || restoring">
             打开 <ArrowRight :size="16" aria-hidden="true" />
@@ -247,13 +279,9 @@ async function restoreDraft() {
           <div v-else class="video-empty">
             <span class="video-illustration"><Play :size="27" :stroke-width="1.7" aria-hidden="true" /></span>
             <h3>{{ loading ? '正在打开自习室' : active ? '前往 B 站观看此课程' : '打开一节 B 站课' }}</h3>
-            <a
-              v-if="active"
-              class="quiet-button"
-              :href="active.original_url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >在 B 站打开 <ArrowUpRight :size="15" aria-hidden="true" /></a>
+            <a v-if="active" class="quiet-button" :href="active.original_url" target="_blank" rel="noopener noreferrer"
+              >在 B 站打开 <ArrowUpRight :size="15" aria-hidden="true"
+            /></a>
             <p v-else-if="!loading">支持视频、短链接和多 P 选集</p>
           </div>
         </div>
@@ -270,7 +298,7 @@ async function restoreDraft() {
               maxlength="80"
               @change="rename"
               @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
-            >
+            />
             <PencilLine :size="14" aria-hidden="true" class="rename-icon" />
           </div>
           <div class="course-actions">
@@ -280,14 +308,17 @@ async function restoreDraft() {
               class="text-button"
               :aria-label="'从续播点 ' + bookmarked + ' 播放'"
               @click="seek(active, active.seconds, true)"
-            ><Clock3 :size="15" aria-hidden="true" /> {{ bookmarked }}</button>
+            >
+              <Clock3 :size="15" aria-hidden="true" /> {{ bookmarked }}
+            </button>
             <a
               v-if="active.embed_url"
               class="text-button"
               :href="sourceAt(active, active.seconds)"
               target="_blank"
               rel="noopener noreferrer"
-            >B 站原页 <ExternalLink :size="14" aria-hidden="true" /></a>
+              >B 站原页 <ExternalLink :size="14" aria-hidden="true"
+            /></a>
           </div>
         </div>
       </section>
@@ -295,7 +326,12 @@ async function restoreDraft() {
       <section class="panel note-panel" aria-labelledby="note-heading">
         <div class="panel-header">
           <h2 id="note-heading"><PencilLine :size="19" aria-hidden="true" /> 课程笔记</h2>
-          <span v-if="draft" class="save-status" :class="{ 'save-warning': draft.status === 'conflict' || draft.status === 'offline' }" role="status">
+          <span
+            v-if="draft"
+            class="save-status"
+            :class="{ 'save-warning': draft.status === 'conflict' || draft.status === 'offline' }"
+            role="status"
+          >
             <Check v-if="draft.status === 'saved'" :size="15" aria-hidden="true" /> {{ noteStatus }}
           </span>
         </div>
@@ -312,10 +348,20 @@ async function restoreDraft() {
                 placeholder="分:秒"
                 maxlength="8"
                 @input="stampError = ''"
-              >
+              />
             </label>
-            <button type="submit" class="quiet-button" title="插入时间点（Alt+T）"><ArrowDownRight :size="15" aria-hidden="true" /> 插入</button>
-            <button v-if="active.embed_url" type="button" class="quiet-button mark-button" :disabled="updating" @click="saveBookmark">设为续播点</button>
+            <button type="submit" class="quiet-button" title="插入时间点（Alt+T）">
+              <ArrowDownRight :size="15" aria-hidden="true" /> 插入
+            </button>
+            <button
+              v-if="active.embed_url"
+              type="button"
+              class="quiet-button mark-button"
+              :disabled="updating"
+              @click="saveBookmark"
+            >
+              设为续播点
+            </button>
           </form>
           <p v-if="stampError" class="error" role="alert">{{ stampError }}</p>
           <NoteEditor
@@ -334,13 +380,21 @@ async function restoreDraft() {
                 class="time-chip"
                 :aria-label="'跳到 ' + formatTime(seconds)"
                 @click="seek(active, seconds, true)"
-              ><Play :size="11" aria-hidden="true" /> {{ formatTime(seconds) }}</button>
+              >
+                <Play :size="11" aria-hidden="true" /> {{ formatTime(seconds) }}
+              </button>
               <span v-else class="time-chip"><Clock3 :size="12" aria-hidden="true" /> {{ formatTime(seconds) }}</span>
             </template>
           </div>
           <div v-if="draft.status === 'conflict' || draft.status === 'offline'" class="recovery">
             <span v-if="draft.status === 'conflict'">可先下载当前草稿，再载入已保存版。</span>
-            <button v-if="draft.status === 'conflict'" type="button" class="text-button" :disabled="restoring" @click="restoreDraft">
+            <button
+              v-if="draft.status === 'conflict'"
+              type="button"
+              class="text-button"
+              :disabled="restoring"
+              @click="restoreDraft"
+            >
               载入已保存版
             </button>
             <button v-else type="button" class="text-button" @click="saveDraft">重试保存</button>
@@ -352,14 +406,18 @@ async function restoreDraft() {
               type="button"
               :class="obsidianEnabled ? 'quiet-button' : 'primary-button'"
               @click="downloadNote(active, draft.text)"
-            ><ArrowDownToLine :size="16" aria-hidden="true" /> 下载 Markdown</button>
+            >
+              <ArrowDownToLine :size="16" aria-hidden="true" /> 下载 Markdown
+            </button>
             <button
               v-if="obsidianEnabled"
               type="button"
               class="primary-button"
               :disabled="exporting || restoring"
               @click="exportToObsidian"
-            ><Save :size="16" aria-hidden="true" /> {{ exporting ? '写入中' : '保存到 Obsidian' }}</button>
+            >
+              <Save :size="16" aria-hidden="true" /> {{ exporting ? '写入中' : '保存到 Obsidian' }}
+            </button>
             <span v-else class="export-help" title="在 .env 设置 ZHIJING_STUDY_OBSIDIAN_DIR，可直接保存到 Obsidian">
               <CircleHelp :size="15" aria-hidden="true" /> 或配置 Obsidian 目录
             </span>

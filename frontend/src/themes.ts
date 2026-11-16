@@ -1,5 +1,7 @@
 import { CloudRain, Gamepad2, LibraryBig, Sailboat, Sunrise, TrainFront } from '@lucide/vue'
 import type { Component } from 'vue'
+import { API_BASE, errorDetail } from './api/http'
+import type { ThemeCardDto, ThemeLimitsDto } from './api/types'
 import library from './assets/library.jpg'
 import morning from './assets/morning.jpg'
 import pixel from './assets/pixel.jpg'
@@ -38,15 +40,75 @@ export const DEFAULT_THEME_ID = 'rain'
 export const DEFAULT_THEME_LIMITS: ThemeLimits = { maxArchiveMb: 32, maxExpandedMb: 64, maxEntries: 32 }
 
 export const builtinThemes: readonly Theme[] = [
-  { id: 'rain', name: '雨窗', backgroundUrl: rain, coverUrl: rain, backgroundVideoUrl: null, ambientUrl: null, builtin: true, motion: 'zoom', icon: CloudRain },
-  { id: 'library', name: '夜间图书馆', backgroundUrl: library, coverUrl: library, backgroundVideoUrl: null, ambientUrl: null, builtin: true, motion: 'drift', icon: LibraryBig },
-  { id: 'morning', name: '清晨书桌', backgroundUrl: morning, coverUrl: morning, backgroundVideoUrl: null, ambientUrl: null, builtin: true, motion: 'drift', icon: Sunrise },
-  { id: 'seaside', name: '海边木屋', backgroundUrl: seaside, coverUrl: seaside, backgroundVideoUrl: null, ambientUrl: null, builtin: true, motion: 'zoom', icon: Sailboat },
-  { id: 'train', name: '暮色列车', backgroundUrl: train, coverUrl: train, backgroundVideoUrl: null, ambientUrl: null, builtin: true, motion: 'drift', icon: TrainFront },
-  { id: 'pixel', name: '像素夏夜', backgroundUrl: pixel, coverUrl: pixel, backgroundVideoUrl: null, ambientUrl: null, builtin: true, motion: 'none', icon: Gamepad2 },
+  {
+    id: 'rain',
+    name: '雨窗',
+    backgroundUrl: rain,
+    coverUrl: rain,
+    backgroundVideoUrl: null,
+    ambientUrl: null,
+    builtin: true,
+    motion: 'zoom',
+    icon: CloudRain,
+  },
+  {
+    id: 'library',
+    name: '夜间图书馆',
+    backgroundUrl: library,
+    coverUrl: library,
+    backgroundVideoUrl: null,
+    ambientUrl: null,
+    builtin: true,
+    motion: 'drift',
+    icon: LibraryBig,
+  },
+  {
+    id: 'morning',
+    name: '清晨书桌',
+    backgroundUrl: morning,
+    coverUrl: morning,
+    backgroundVideoUrl: null,
+    ambientUrl: null,
+    builtin: true,
+    motion: 'drift',
+    icon: Sunrise,
+  },
+  {
+    id: 'seaside',
+    name: '海边木屋',
+    backgroundUrl: seaside,
+    coverUrl: seaside,
+    backgroundVideoUrl: null,
+    ambientUrl: null,
+    builtin: true,
+    motion: 'zoom',
+    icon: Sailboat,
+  },
+  {
+    id: 'train',
+    name: '暮色列车',
+    backgroundUrl: train,
+    coverUrl: train,
+    backgroundVideoUrl: null,
+    ambientUrl: null,
+    builtin: true,
+    motion: 'drift',
+    icon: TrainFront,
+  },
+  {
+    id: 'pixel',
+    name: '像素夏夜',
+    backgroundUrl: pixel,
+    coverUrl: pixel,
+    backgroundVideoUrl: null,
+    ambientUrl: null,
+    builtin: true,
+    motion: 'none',
+    icon: Gamepad2,
+  },
 ]
 
-const API = '/api/study/themes'
+const API = `${API_BASE}/study/themes`
 
 export class ThemeError extends Error {
   constructor(message: string) {
@@ -56,40 +118,31 @@ export class ThemeError extends Error {
 }
 
 export function findTheme(id: string, custom: readonly Theme[] = []): Theme | undefined {
-  return builtinThemes.find(item => item.id === id) ?? custom.find(item => item.id === id)
+  return builtinThemes.find((item) => item.id === id) ?? custom.find((item) => item.id === id)
 }
 
 export function themeMessage(error: unknown): string {
   return error instanceof ThemeError ? error.message : '无法连接知径，请确认本地服务正在运行'
 }
 
-function detailText(detail: unknown): string | null {
-  if (typeof detail === 'string' && detail.trim()) return detail
-  if (Array.isArray(detail)) {
-    const messages = detail
-      .map(item => (item && typeof (item as { msg?: unknown }).msg === 'string' ? (item as { msg: string }).msg : ''))
-      .filter(message => message.length > 0)
-    if (messages.length) return messages.join('；')
-  }
-  return null
-}
-
 async function failure(response: Response): Promise<string> {
   const body = await response.json().catch(() => null)
-  return detailText((body as { detail?: unknown } | null)?.detail)
-    ?? (response.status === 413 ? '主题包超过上传大小限制' : '主题请求失败，请稍后重试')
+  return errorDetail(body) ?? (response.status === 413 ? '主题包超过上传大小限制' : '主题请求失败，请稍后重试')
 }
 
-function toTheme(payload: unknown): Theme | null {
+/**
+ * 把生成类型 ThemeCardDto 映射成前端主题模型。
+ * 后端契约由 openapi-typescript 生成，此处只做 snake_case → camelCase 与运行时兜底。
+ */
+function toTheme(payload: ThemeCardDto | null | undefined): Theme | null {
   if (!payload || typeof payload !== 'object') return null
-  const item = payload as Record<string, unknown>
+  const item = payload as Partial<ThemeCardDto>
   if (typeof item.id !== 'string' || !item.id) return null
   if (typeof item.background_url !== 'string' || !item.background_url) return null
   const coverUrl = typeof item.cover_url === 'string' && item.cover_url ? item.cover_url : item.background_url
   const ambientUrl = typeof item.ambient_url === 'string' && item.ambient_url ? item.ambient_url : null
-  const backgroundVideoUrl = typeof item.background_video_url === 'string' && item.background_video_url
-    ? item.background_video_url
-    : null
+  const backgroundVideoUrl =
+    typeof item.background_video_url === 'string' && item.background_video_url ? item.background_video_url : null
   const name = typeof item.name === 'string' && item.name.trim() ? item.name : item.id
   return {
     id: item.id,
@@ -147,7 +200,7 @@ export async function listThemes(): Promise<Theme[]> {
   if (!response.ok) throw new ThemeError(await failure(response))
   const payload: unknown = await response.json().catch(() => null)
   if (!Array.isArray(payload)) throw new ThemeError('主题库数据格式不正确')
-  return payload.map(toTheme).filter((item): item is Theme => item !== null)
+  return payload.map((item) => toTheme(item as ThemeCardDto)).filter((item): item is Theme => item !== null)
 }
 
 export async function importTheme(file: File): Promise<Theme> {
@@ -157,7 +210,7 @@ export async function importTheme(file: File): Promise<Theme> {
     body: file,
   })
   if (!response.ok) throw new ThemeError(await failure(response))
-  const theme = toTheme(await response.json().catch(() => null))
+  const theme = toTheme((await response.json().catch(() => null)) as ThemeCardDto | null)
   if (!theme) throw new ThemeError('主题包已保存，但返回的主题信息不完整')
   return theme
 }
@@ -174,7 +227,7 @@ export async function renameTheme(id: string, name: string): Promise<Theme> {
     body: JSON.stringify({ name }),
   })
   if (!response.ok) throw new ThemeError(await failure(response))
-  const theme = toTheme(await response.json().catch(() => null))
+  const theme = toTheme((await response.json().catch(() => null)) as ThemeCardDto | null)
   if (!theme) throw new ThemeError('主题已重命名，但返回的主题信息不完整')
   return theme
 }
@@ -193,7 +246,7 @@ export async function getThemeLimits(): Promise<ThemeLimits> {
     if (!response.ok) return { ...DEFAULT_THEME_LIMITS }
     const payload: unknown = await response.json().catch(() => null)
     if (!payload || typeof payload !== 'object') return { ...DEFAULT_THEME_LIMITS }
-    const item = payload as Record<string, unknown>
+    const item = payload as Partial<ThemeLimitsDto>
     return {
       maxArchiveMb: positiveInteger(item.max_archive_mb) ?? DEFAULT_THEME_LIMITS.maxArchiveMb,
       maxExpandedMb: positiveInteger(item.max_expanded_mb) ?? DEFAULT_THEME_LIMITS.maxExpandedMb,
