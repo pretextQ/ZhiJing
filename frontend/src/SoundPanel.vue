@@ -3,6 +3,9 @@ import { ChevronDown, Headphones, ListMusic, Plus, Trash2, Volume2, VolumeX } fr
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { type Track, readTracks, saveTracks } from './playlist'
 import { readLocal, writeLocal } from './preferences'
+import type { Theme } from './themes'
+
+const props = defineProps<{ theme?: Theme | null }>()
 
 const noises = [
   { id: 'off', label: '静音' },
@@ -10,8 +13,15 @@ const noises = [
   { id: 'pink', label: '粉噪音' },
   { id: 'brown', label: '棕噪音' },
 ] as const
-type Noise = typeof noises[number]['id']
+type Noise = typeof noises[number]['id'] | 'theme'
 const noise = ref<Noise>('off')
+const ambientAudio = ref<HTMLAudioElement>()
+const ambientUrl = computed(() => props.theme?.ambientUrl ?? null)
+const noiseOptions = computed<{ id: Noise; label: string }[]>(() => {
+  const options: { id: Noise; label: string }[] = noises.map(item => ({ id: item.id, label: item.label }))
+  if (ambientUrl.value) options.push({ id: 'theme', label: '主题环境音' })
+  return options
+})
 const volume = ref(readLocal<number>('noise-volume') ?? 25)
 const tracks = shallowRef<Track[]>([])
 const trackId = ref('')
@@ -28,7 +38,7 @@ let source: AudioBufferSourceNode | undefined
 let gain: GainNode | undefined
 let soundChange = 0
 
-function makeNoise(audioContext: AudioContext, kind: Exclude<Noise, 'off'>) {
+function makeNoise(audioContext: AudioContext, kind: Exclude<Noise, 'off' | 'theme'>) {
   const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 12, audioContext.sampleRate)
   const data = buffer.getChannelData(0)
   let previous = 0
@@ -64,13 +74,36 @@ function stopNoise() {
   source = undefined
 }
 
+async function playAmbient(change: number) {
+  await nextTick()
+  const element = ambientAudio.value
+  if (!element || !ambientUrl.value) {
+    if (change === soundChange) noise.value = 'off'
+    return
+  }
+  element.volume = volume.value / 100
+  try {
+    element.currentTime = 0
+    await element.play()
+  } catch {
+    if (change !== soundChange) return
+    noise.value = 'off'
+    noiseError.value = '主题环境音无法播放'
+  }
+}
+
 async function changeNoise(event: Event) {
   const kind = (event.target as HTMLSelectElement).value as Noise
   const change = ++soundChange
   noise.value = kind
   noiseError.value = ''
   stopNoise()
+  ambientAudio.value?.pause()
   if (kind === 'off') return
+  if (kind === 'theme') {
+    await playAmbient(change)
+    return
+  }
   try {
     context ??= new AudioContext()
     if (!gain) {
@@ -95,7 +128,24 @@ async function changeNoise(event: Event) {
 watch(volume, value => {
   writeLocal('noise-volume', value)
   if (context && gain) gain.gain.setTargetAtTime(value / 100, context.currentTime, .025)
+  if (ambientAudio.value) ambientAudio.value.volume = value / 100
 })
+
+watch(ambientUrl, url => {
+  ambientAudio.value?.pause()
+  if (noise.value !== 'theme') return
+  if (!url) {
+    noise.value = 'off'
+    return
+  }
+  void playAmbient(++soundChange)
+})
+
+function ambientFailed() {
+  if (noise.value !== 'theme') return
+  noise.value = 'off'
+  noiseError.value = '主题环境音无法播放'
+}
 
 async function selectTrack(id: string, play = false) {
   const track = tracks.value.find(item => item.id === id)
@@ -173,6 +223,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   ++soundChange
+  ambientAudio.value?.pause()
   stopNoise()
   void context?.close()
   if (trackUrl.value) URL.revokeObjectURL(trackUrl.value)
@@ -186,7 +237,7 @@ onBeforeUnmount(() => {
       <label for="noise-kind">环境音</label>
       <span class="select-wrap">
         <select id="noise-kind" :value="noise" @change="changeNoise">
-          <option v-for="item in noises" :key="item.id" :value="item.id">{{ item.label }}</option>
+          <option v-for="item in noiseOptions" :key="item.id" :value="item.id">{{ item.label }}</option>
         </select>
         <ChevronDown :size="14" aria-hidden="true" />
       </span>
@@ -235,6 +286,17 @@ onBeforeUnmount(() => {
       ><Plus :size="17" aria-hidden="true" /> 添加音乐</button>
       <input ref="fileInput" type="file" accept="audio/*,.flac,.opus" multiple hidden @change="importTracks">
     </div>
+    <audio
+      v-if="ambientUrl"
+      ref="ambientAudio"
+      :src="ambientUrl"
+      loop
+      preload="auto"
+      aria-label="主题环境音"
+      data-theme-ambient
+      hidden
+      @error="ambientFailed"
+    ></audio>
     <p v-if="noiseError || playlistError" class="sound-error" role="status">{{ noiseError || playlistError }}</p>
   </section>
 </template>

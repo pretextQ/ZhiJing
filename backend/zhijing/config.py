@@ -26,3 +26,4 @@ class StudySettings(BaseSettings):
 
     database: Path = Path(".data/study.sqlite3")
     obsidian_dir: Path | None = None
+    theme_dir: Path | None = None

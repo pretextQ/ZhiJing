@@ -15,6 +15,7 @@ from .config import Settings, StudySettings
 from .markdown import JAVA_TRIM
 from .polish import polish_events
 from .study import StudyStore, router as study_router
+from .themes import ThemeStore, router as themes_router
 
 FRONTEND = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
@@ -46,7 +47,9 @@ def create_app(settings: Settings | None = None, study_settings: StudySettings |
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.settings = settings if settings is not None else Settings()
-        app.state.study = StudyStore(study_settings if study_settings is not None else StudySettings())
+        resolved_study = study_settings if study_settings is not None else StudySettings()
+        app.state.study = StudyStore(resolved_study)
+        app.state.themes = ThemeStore(resolved_study)
         app.state.polish_lock = Lock()
         async with httpx.AsyncClient() as client:
             app.state.model_client = client
@@ -99,6 +102,7 @@ def create_app(settings: Settings | None = None, study_settings: StudySettings |
         )
 
     app.include_router(study_router)
+    app.include_router(themes_router)
     if (FRONTEND / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=FRONTEND / "assets"), name="study-assets")
 
