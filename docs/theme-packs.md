@@ -1,6 +1,6 @@
 # 场景与主题包
 
-知径内置六款自习室场景，也可以导入自己的 ZIP 主题包。本文说明内置素材来源、主题包格式、导入限制、接口和验收方法。开发计划见 [后续开发计划](development-plan.md)。
+知径内置六款自习室场景，也可以导入自己的 ZIP 主题包。本文说明内置素材来源、主题包格式（静态背景、动态视频、环境音）、导入/导出/重命名、可配置限制、接口和验收方法。开发计划见 [后续开发计划](development-plan.md)。
 
 ## 一、内置主题
 
@@ -15,6 +15,8 @@
 
 四张新图是可供发布的原创合成素材，不含第三方摄影或字体；随项目按 PolyForm Noncommercial License 1.0.0 发布。如需换成真实摄影，按 2172×724（约 3:1）的同名 JPEG 替换并重新构建前端即可。可运行 `python dev/generate_theme_assets.py` 重新生成（需要 Pillow 与 numpy）。
 
+内置主题带轻微背景动效（雨窗、海边木屋为缓慢缩放；夜间图书馆、清晨书桌、暮色列车为缓慢平移；像素夏夜保持静止），可在场景面板用「背景动效」关闭，系统开启减少动效时自动停用。
+
 ## 二、主题包格式
 
 主题包是 ZIP 文件，根目录必须放 UTF-8 编码的 `theme.json`。清单里的文件名是包内相对路径，支持中文文件名和子目录。
@@ -24,6 +26,7 @@ my-study-room.zip
 ├── theme.json
 ├── cover.jpg
 ├── background.webp
+├── loop.webm
 └── rain.mp3
 ```
 
@@ -33,6 +36,7 @@ my-study-room.zip
   "name": "我的雨天书桌",
   "background": "background.webp",
   "cover": "cover.jpg",
+  "backgroundVideo": "loop.webm",
   "ambient": "rain.mp3"
 }
 ```
@@ -43,20 +47,21 @@ my-study-room.zip
 | `name` | 是 | 去首尾空白后 1–60 个字符，显示在主题卡片上 |
 | `background` | 是 | 首页背景图，支持 JPEG、PNG、WebP |
 | `cover` | 否 | 卡片封面图；省略时使用 `background` |
+| `backgroundVideo` | 否 | 可选动态背景视频，支持 WebM、MP4；静音循环播放，静态 `background` 作为封面和加载失败时的回退 |
 | `ambient` | 否 | 可选环境音，支持 MP3、Ogg；导入后在「声音设置 → 环境音」出现「主题环境音」 |
 
 限制与校验：
 
-- ZIP 文件不超过 32 MiB，展开后总大小不超过 64 MiB，最多 32 个条目。
+- 默认 ZIP 文件不超过 32 MiB，展开后总大小不超过 64 MiB，最多 32 个条目；上限可通过 `ZHIJING_STUDY_THEME_MAX_ARCHIVE_MB`、`ZHIJING_STUDY_THEME_MAX_EXPANDED_MB`、`ZHIJING_STUDY_THEME_MAX_ENTRIES` 调整，导入面板会显示当前值。
 - 只接受普通文件；拒绝绝对路径、`..`、反斜杠、盘符、空路径段、符号链接和加密条目。
-- 图片与音频按扩展名和文件魔数双重校验；引用文件必须在包内真实存在。
+- 图片、音频和视频按扩展名与文件魔数双重校验；引用文件必须在包内真实存在。
 - `theme.json` 必须位于 ZIP 根目录；引用路径按正斜杠 `/` 相对定位。
 - 同一份 ZIP（按字节 sha256）重复导入不会产生新卡片，而是返回已有主题卡片。
 
 制作示例（PowerShell，在主题包目录内执行）：
 
 ```powershell
-Compress-Archive -Path theme.json,cover.jpg,background.webp,rain.mp3 -DestinationPath ../my-study-room.zip -Force
+Compress-Archive -Path theme.json,cover.jpg,background.webp,loop.webm,rain.mp3 -DestinationPath ../my-study-room.zip -Force
 ```
 
 注意不要把外层文件夹一起压进 ZIP，否则 `theme.json` 不在根目录，导入会失败。
@@ -67,8 +72,8 @@ Compress-Archive -Path theme.json,cover.jpg,background.webp,rain.mp3 -Destinatio
 2. 点击卡片预览：首页背景切换为预览图，当前已应用主题保留，卡片标记「预览」。
 3. 点击「应用此场景」保存选择并关闭面板，刷新后恢复；按 Escape 或关闭按钮放弃预览并回到已应用场景。
 4. 点击「导入主题包」选择 ZIP。导入成功后卡片出现在「我的主题」，并立即进入预览；失败时面板内显示具体原因。
-5. 自定义主题卡片上的删除按钮需要二次确认。删除当前正在使用的主题后回到「雨窗」；删除其他主题不影响当前场景。
-6. 自定义主题环境音在「声音」面板的「环境音」下拉框中选择，音量与白噪音共用；本地歌单独立控制。
+5. 自定义主题卡片可以重命名或导出为 ZIP；重命名只改卡片与清单里的名称，导出包含当前清单和全部引用素材，便于分享或备份。删除按钮需要二次确认；删除当前正在使用的主题后回到「雨窗」，删除其他主题不影响当前场景。
+6. 自定义主题环境音在「声音」面板的「环境音」下拉框中选择，音量与白噪音共用；本地歌单独立控制。主题包带动态背景视频时，视频在动效开启时静音循环播放；关闭「背景动效」或系统减少动效时显示静态背景。
 
 主题选择保存在浏览器 `localStorage` 的 `zhijing:scene`；自定义主题的文件保存在服务端 SQLite 数据目录，刷新页面或重建 Docker 容器都不会丢失（使用同名数据卷时）。
 
@@ -78,9 +83,12 @@ Compress-Archive -Path theme.json,cover.jpg,background.webp,rain.mp3 -Destinatio
 
 | 方法与路径 | 说明 |
 | --- | --- |
-| `GET /api/study/themes` | 列出全部自定义主题卡片 |
+| `GET /api/study/themes` | 列出全部自定义主题卡片（含 `background_video_url`） |
+| `GET /api/study/themes/limits` | 返回当前 ZIP / 解压 / 条目限制 |
 | `POST /api/study/themes` | 请求体为 ZIP 字节，`Content-Type: application/zip`；成功返回主题卡片 |
-| `GET /api/study/themes/{id}/assets/{path}` | 读取经校验的封面、背景或环境音 |
+| `PATCH /api/study/themes/{id}` | JSON `{"name": "..."}` 重命名，返回主题卡片 |
+| `GET /api/study/themes/{id}/export` | 导出主题 ZIP（清单 + 引用素材），带下载文件名 |
+| `GET /api/study/themes/{id}/assets/{path}` | 读取经校验的封面、背景、视频或环境音 |
 | `DELETE /api/study/themes/{id}` | 删除自定义主题，成功返回 204 |
 
 接口与自习室 API 一样只允许本机地址和同源页面访问，响应不缓存。错误响应为 `{"detail": "中文原因"}`，前端直接展示。
@@ -119,4 +127,4 @@ docker compose -f compose.yaml -p zhijing-theme-qa up -d --force-recreate --wait
 docker compose -f compose.yaml -p zhijing-theme-qa down -v
 ```
 
-2026-11-16 的验收结果：后端 84 项测试通过；前端类型检查与构建通过；浏览器脚本与 Docker 脚本均 PASS，重建容器后背景与可选音频仍可读取；无效 ZIP 返回 422 中文原因且不改变主题库。
+2026-11-16 的验收结果：后端 122 项测试通过；前端类型检查与构建通过；浏览器脚本覆盖动效开关/系统减少动效、动态视频播放、重命名与导出 ZIP、可配置限制提示、320px、深色和看课笔记往返；Docker 脚本验证导入、视频/音频素材、重命名、导出，以及重建容器后同一数据卷仍可读取；无效 ZIP 返回 422 中文原因且不改变主题库。

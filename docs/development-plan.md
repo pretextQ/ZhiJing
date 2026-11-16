@@ -145,6 +145,40 @@ uv run --locked --no-sync python .dev/verify_study_mvp.py
 ### 待验证与后续
 
 - 四张新增场景图是项目原创合成插画，可按 [场景与主题包](theme-packs.md) 替换为有授权的真实摄影；替换后重新构建前端即可。
-- 动态背景、主题包导出和主题库排序/重命名未在本次范围，保留在后续候选中。
+- 动态背景、主题包导出与重命名已在下一轮完成（见下方记录）；主题库排序仍在后续候选中。
 - 主题限制目前为代码常量，尚未做成用户可配置项。
 - 本机已存在的旧 `zhijing` 容器仍运行旧镜像；需要更新时在仓库根目录执行 `docker compose up -d --build`。
+
+## 动态背景与主题管理实施记录（2026-11-16）
+
+在上一轮场景与主题包交付后，继续完成后续候选中的动态背景、主题包导出/重命名和主题限制可配置化。
+
+### 交付内容
+
+- 动态背景：主题包清单新增可选 `backgroundVideo`（WebM/MP4，魔数校验），首页在动效开启时静音循环播放视频，静态背景作为封面和失败回退；内置六款主题使用缓慢平移/缩放动效，场景面板新增「背景动效」开关（`zhijing:motion`），系统要求减少动效时自动停用。
+- 主题管理：`PATCH /api/study/themes/{id}` 重命名（原子更新 `theme.json`）；`GET /api/study/themes/{id}/export` 导出包含清单与全部引用素材的 ZIP，支持中文下载名；自定义主题卡片增加导出、重命名工具栏，重命名支持 Enter/失焦保存和 Escape 取消。
+- 可配置限制：`ZHIJING_STUDY_THEME_MAX_ARCHIVE_MB`、`_MAX_EXPANDED_MB`、`_MAX_ENTRIES` 控制导入上限，`GET /api/study/themes/limits` 返回实际值，面板显示当前限制。
+- 测试素材：[scene-loop.webm](../tests/fixtures/scene-loop.webm) 为 3 秒合成动态背景，仅用于浏览器和接口验收。
+
+### 实际验证
+
+```text
+uv run --locked --no-sync pytest -q
+  122 passed, 1 warning（原 84 项 + 视频/重命名/导出/限制新增 38 项）
+npm.cmd --prefix frontend run build
+  vue-tsc --noEmit 通过；vite build 成功
+$env:PYTHONPATH=(Resolve-Path .dev/browser-deps).Path
+uv run --locked --no-sync python dev/verify_themes.py
+  PASS：动效开关与减少动效、动态视频播放、重命名、导出 ZIP 内容、限制提示、320px、深色、
+        预览/应用/刷新、导入/重复/无效包、主题环境音、计时与课程草稿往返、删除回退
+uv run --locked --no-sync python dev/verify_themes_docker.py
+  PASS：导入含视频包、重命名与导出、重建容器后素材仍可读、无效包 422、删除后清空
+$env:PYTHONPATH=(Resolve-Path .dev/browser-deps).Path
+uv run --locked --no-sync python .dev/verify_study_mvp.py
+  PASS：专注计时、导航、音频、场景、深浅色、320px、课程草稿/撤销与 Obsidian 导出
+```
+
+### 仍在范围外
+
+- 真实摄影或视频素材的授权替换、主题库排序与搜索、动态背景视频的转码/压缩均未在本次实现。
+- 主题限制目前为整数 MiB/条目数，尚未提供管理界面；通过环境变量或 `.env` 调整。
