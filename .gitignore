@@ -1,0 +1,11 @@
+.dev/
+.venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+.pytest_cache/
+*.py[cod]
+node_modules/
+uploads/
+backups/
