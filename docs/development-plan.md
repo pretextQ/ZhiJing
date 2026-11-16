@@ -113,8 +113,8 @@ docker compose -f compose.yaml -p zhijing-theme-qa up -d --build --wait
 
 ### 交付内容
 
-- 后端：[themes.py](../backend/zhijing/themes.py) 提供自定义主题导入、列表、素材读取与删除；[config.py](../backend/zhijing/config.py) 支持 `ZHIJING_STUDY_THEME_DIR`；[main.py](../backend/zhijing/main.py) 挂载路由。ZIP 32 MiB、展开 64 MiB、32 条目限制，校验清单、路径、符号链接、加密条目和素材魔数，暂存目录加原子发布，同包 sha256 去重。
-- 前端：[themes.ts](../frontend/src/themes.ts) 内置六款主题并封装接口，[App.vue](../frontend/src/App.vue) 实现 3/2/1 列场景面板、预览/应用/删除/导入与键盘焦点，[SoundPanel.vue](../frontend/src/SoundPanel.vue) 增加主题环境音，[styles.css](../frontend/src/styles.css) 覆盖 320px、深浅色和粘性操作栏。
+- 后端：[services/themes.py](../backend/zhijing/services/themes.py) 提供自定义主题导入、列表、素材读取与删除；[settings.py](../backend/zhijing/settings.py) 支持 `ZHIJING_STUDY_THEME_DIR`；[main.py](../backend/zhijing/main.py) 挂载路由。ZIP 32 MiB、展开 64 MiB、32 条目限制，校验清单、路径、符号链接、加密条目和素材魔数，暂存目录加原子发布，同包 sha256 去重。
+- 前端：[themes.ts](../frontend/src/themes.ts) 内置六款主题并封装接口，[ThemePanel.vue](../frontend/src/components/ThemePanel.vue) 实现 3/2/1 列场景面板、预览/应用/删除/导入与键盘焦点，[SoundPanel.vue](../frontend/src/components/SoundPanel.vue) 增加主题环境音，[styles/themes.css](../frontend/src/styles/themes.css) 覆盖 320px、深浅色和粘性操作栏。
 - 素材：[morning.jpg](../frontend/src/assets/morning.jpg)、[seaside.jpg](../frontend/src/assets/seaside.jpg)、[train.jpg](../frontend/src/assets/train.jpg)、[pixel.jpg](../frontend/src/assets/pixel.jpg)，由 [generate_theme_assets.py](../dev/generate_theme_assets.py) 生成的原创合成插画；来源与授权见 [场景与主题包](theme-packs.md)。
 - 测试与验收：[test_themes.py](../tests/test_themes.py) 新增 50 项用例；[verify_themes.py](../dev/verify_themes.py) 与 [verify_themes_docker.py](../dev/verify_themes_docker.py) 提供浏览器和 Docker 验收脚本。
 - 文档：[场景与主题包](theme-packs.md)、[README](../README.md)。
@@ -146,7 +146,7 @@ uv run --locked --no-sync python .dev/verify_study_mvp.py
 
 - 四张新增场景图是项目原创合成插画，可按 [场景与主题包](theme-packs.md) 替换为有授权的真实摄影；替换后重新构建前端即可。
 - 动态背景、主题包导出与重命名已在下一轮完成（见下方记录）；主题库排序仍在后续候选中。
-- 主题限制目前为代码常量，尚未做成用户可配置项。
+- 主题限制已可配置（见下一轮记录）。
 - 本机已存在的旧 `zhijing` 容器仍运行旧镜像；需要更新时在仓库根目录执行 `docker compose up -d --build`。
 
 ## 动态背景与主题管理实施记录（2026-11-16）
@@ -182,3 +182,43 @@ uv run --locked --no-sync python .dev/verify_study_mvp.py
 
 - 真实摄影或视频素材的授权替换、主题库排序与搜索、动态背景视频的转码/压缩均未在本次实现。
 - 主题限制目前为整数 MiB/条目数，尚未提供管理界面；通过环境变量或 `.env` 调整。
+
+## 阶段1基础设施实施记录（2026-11-16）
+
+按架构评审的阶段1，完成数据库迁移、后端分层、数据目录/备份、前端路由与状态、质量工具和 OpenAPI 类型。
+
+### 后端
+
+- [infra/db.py](../backend/zhijing/infra/db.py)：启动时按 `PRAGMA user_version` 迁移（当前 v1，兼容旧库），启用 WAL、外键和 busy_timeout；不再在每次请求建表。
+- [settings.py](../backend/zhijing/settings.py)：新增 `ZHIJING_STUDY_DATA_DIR`；数据目录统一推导 SQLite、`themes/` 与 `backups/`。
+- [backup.py](../backend/zhijing/backup.py) 与 [dev/backup.py](../dev/backup.py)：生成含 manifest、SQLite 一致性快照和主题素材的 ZIP，原子写出；支持 `python -m zhijing.backup`。
+- 目录分层：[api/](../backend/zhijing/api/) 薄路由、[services/](../backend/zhijing/services/) 业务、[infra/](../backend/zhijing/infra/) 数据库、[domain/](../backend/zhijing/domain/) 模型、[legacy/](../backend/zhijing/legacy/) 润色兼容层；共享的本地访问依赖在 `api/deps.py`。
+- [tests/test_db.py](../tests/test_db.py)、[tests/test_backup.py](../tests/test_backup.py) 覆盖迁移幂等、旧库保留、快照与备份内容。
+
+### 前端与工具
+
+- vue-router + Pinia：[router/index.ts](../frontend/src/router/index.ts)、[stores/study.ts](../frontend/src/stores/study.ts)、[stores/themes.ts](../frontend/src/stores/themes.ts)；[App.vue](../frontend/src/App.vue) 只保留布局与面板开关，ThemePanel 独立成组件。
+- 样式拆为 [styles/](../frontend/src/styles/) 下 tokens/base/layout/themes/courses，视觉保持不变。
+- Vitest 32 项、ESLint、Prettier：脚本为 `lint`、`format:check`、`test:unit`；生成类型 [api/schema.d.ts](../frontend/src/api/schema.d.ts) 来自 [openapi.json](../frontend/openapi.json)。
+- [.github/workflows/ci.yml](../.github/workflows/ci.yml)：后端 ruff + pytest + OpenAPI 快照校验；前端类型生成校验、lint、format、单测和构建。
+
+### 实际验证
+
+```text
+uv run --locked --no-sync ruff check .                 All checks passed
+uv run --locked --no-sync pytest -q                    135 passed
+uv run --locked --no-sync python dev/export_openapi.py  12 paths / 12 schemas
+npm.cmd --prefix frontend run lint                     eslint 0 error
+npm.cmd --prefix frontend run format:check             All matched files use Prettier code style
+npm.cmd --prefix frontend run test:unit                32 passed
+npm.cmd --prefix frontend run build                    vue-tsc + vite build 通过
+python dev/verify_themes.py                            PASS（含动效/视频/导入导出/计时草稿往返）
+python .dev/verify_study_mvp.py                        PASS（计时、音频、场景、320px、Obsidian 导出）
+python dev/verify_themes_docker.py                     PASS（导入/重建/导出/删除）
+```
+
+### 使用说明
+
+- 本机备份：`uv run --locked --no-sync python dev/backup.py [--output ...]`；Docker 内用 `docker compose exec -e PYTHONPATH=/app/backend zhijing python -m zhijing.backup`。
+- 修改接口后：`uv run --locked --no-sync python dev/export_openapi.py` 然后 `npm.cmd --prefix frontend run gen:api`，CI 会校验快照未漂移。
+- `dev/backup.py` 不进入 Docker 镜像；容器内使用 `python -m zhijing.backup`。

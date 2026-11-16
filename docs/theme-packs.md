@@ -79,7 +79,7 @@ Compress-Archive -Path theme.json,cover.jpg,background.webp,loop.webm,rain.mp3 -
 
 ## 四、存储与接口
 
-自定义主题存放在 `<SQLite 数据目录>/themes/<12 位十六进制主题 ID>/`，可用 `ZHIJING_STUDY_THEME_DIR` 覆盖。本地默认在 `.data/themes/`，Docker 版在 `/data/themes/`，随 `study-data` 卷持久化。目录中包含解压后的素材、原始 `theme.json` 和记录上传包哈希的 `.archive-sha256`。
+自定义主题存放在 `<数据目录>/themes/<12 位十六进制主题 ID>/`，数据目录默认是 SQLite 所在目录（`.data/`），可用 `ZHIJING_STUDY_DATA_DIR` 统一调整、用 `ZHIJING_STUDY_THEME_DIR` 单独覆盖主题目录。Docker 版数据目录为 `/data/`，随 `study-data` 卷持久化；数据库、主题和备份的说明见 [README](../README.md#数据备份与接口类型)。目录中包含解压后的素材、原始 `theme.json` 和记录上传包哈希的 `.archive-sha256`。
 
 | 方法与路径 | 说明 |
 | --- | --- |

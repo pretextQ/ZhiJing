@@ -7,9 +7,11 @@
 | 位置 | 内容 |
 | --- | --- |
 | `frontend/` | Vue、TypeScript 和 Vite 自习室界面。CodeMirror 管理各节课的 Markdown 草稿和撤销记录。 |
-| `backend/zhijing/` | FastAPI 入口、自习室 SQLite 存储、主题包管理、Markdown 导出和流式润色。 |
-| `tests/` | 自习室存储、主题包、导出和润色接口的回归测试。 |
-| `dev/`、`docs/` | 模拟模型、主题素材生成、浏览器验收脚本，以及开发计划和试点记录。 |
+| `backend/zhijing/` | 模块化单体：`api/` 路由、`services/` 业务、`infra/` 数据库与文件、`domain/` 模型、`legacy/` 润色兼容层。 |
+| `frontend/src/` | Vue 3 + vue-router + Pinia；`views/`、`stores/`、`components/`、`styles/` 与生成的 `api/schema.d.ts`。 |
+| `tests/` | 数据库迁移、备份、自习室存储、主题包、导出和润色接口的回归测试。 |
+| `dev/`、`docs/` | 模拟模型、素材生成、备份/OpenAPI/验收脚本，以及开发计划和试点记录。 |
+| `.github/workflows/ci.yml` | 后端 ruff + pytest、前端 lint/格式/单测/构建与 OpenAPI 类型一致性检查。 |
 
 ## 自习室 MVP
 
@@ -76,9 +78,32 @@ npm.cmd --prefix frontend run build
 uv run --locked --no-sync uvicorn zhijing.main:app --app-dir backend --host 127.0.0.1 --port 18081
 ```
 
-打开 [本地自习室](http://127.0.0.1:18081/)。默认 SQLite 路径为 `.data/study.sqlite3`。需要写入 Obsidian 时，在 `.env` 用 `ZHIJING_STUDY_OBSIDIAN_DIR` 指定一个已存在的 Vault 子目录，保存配置后重启服务。Windows 路径可以使用正斜杠。
+打开 [本地自习室](http://127.0.0.1:18081/)。默认数据目录为 `.data/`，SQLite 为 `.data/study.sqlite3`，导入主题在 `.data/themes/`，备份在 `.data/backups/`；可用 `ZHIJING_STUDY_DATA_DIR` 统一调整数据目录。需要写入 Obsidian 时，在 `.env` 用 `ZHIJING_STUDY_OBSIDIAN_DIR` 指定一个已存在的 Vault 子目录，保存配置后重启服务。Windows 路径可以使用正斜杠。
 
 前端开发时，可让上述 FastAPI 服务继续运行，在另一个终端执行 `npm.cmd --prefix frontend run dev`，通过 Vite 的本地地址访问界面。
+
+## 数据、备份与接口类型
+
+服务启动时通过 `PRAGMA user_version` 执行数据库迁移；默认数据目录包含 SQLite、主题包和备份。备份会生成一致的 SQLite 快照与全部主题素材：
+
+```powershell
+uv run --locked --no-sync python dev/backup.py
+uv run --locked --no-sync python dev/backup.py --output D:ackupszhijing.zip
+```
+
+Docker 版备份到数据卷，再复制到宿主机：
+
+```powershell
+docker compose exec -e PYTHONPATH=/app/backend zhijing python -m zhijing.backup --output /data/backups/zhijing.zip
+docker compose cp zhijing:/data/backups/zhijing.zip .
+```
+
+后端接口类型由 OpenAPI 生成到前端，修改接口后执行：
+
+```powershell
+uv run --locked --no-sync python dev/export_openapi.py
+npm.cmd --prefix frontend run gen:api
+```
 
 ## 流式润色
 
@@ -103,10 +128,15 @@ uv run --locked --no-sync uvicorn dev.mock_model:app --host 127.0.0.1 --port 180
 ## 测试
 
 ```powershell
+uv run --locked --no-sync ruff check .
 uv run --locked --no-sync pytest -q
+npm.cmd --prefix frontend run lint
+npm.cmd --prefix frontend run format:check
+npm.cmd --prefix frontend run test:unit
+npm.cmd --prefix frontend run build
 ```
 
-Python 测试使用临时 SQLite 文件和合成主题包，无需启动外部数据库。前期与 LearnHub 旧编辑器的兼容验证见 [试点记录](docs/learnhub-pilot.md)，主题包的制作和验收见 [场景与主题包](docs/theme-packs.md)。
+Python 测试使用临时 SQLite 文件和合成主题包，无需启动外部数据库。CI 在 [.github/workflows/ci.yml](.github/workflows/ci.yml) 中执行同一组检查，并校验 OpenAPI 快照与生成的 TS 类型没有漂移。前期与 LearnHub 旧编辑器的兼容验证见 [试点记录](docs/learnhub-pilot.md)，主题包的制作和验收见 [场景与主题包](docs/theme-packs.md)。
 
 项目约定和两份 Markdown 技能源自 LearnHub `767b4aa`，相关材料适用 [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)。
 
