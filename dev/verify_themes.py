@@ -33,6 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 URL = "http://127.0.0.1:18127"
 BUILTINS = ["rain", "library", "morning", "seaside", "train", "pixel"]
 BUILTIN_NAMES = ["雨窗", "夜间图书馆", "清晨书桌", "海边木屋", "暮色列车", "像素夏夜"]
+VIDEO = (ROOT / "tests" / "fixtures" / "scene-loop.webm").read_bytes()
 
 
 def make_png(width: int = 12, height: int = 12, color=(58, 104, 82)) -> bytes:
@@ -52,7 +53,9 @@ def make_mp3() -> bytes:
     return frame * 80
 
 
-def make_zip(name: str, *, background: bool = True, cover: bool = True, ambient: bool = True) -> bytes:
+def make_zip(
+    name: str, *, background: bool = True, cover: bool = True, ambient: bool = True, video: bool = True
+) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         manifest = {"schemaVersion": 1, "name": name}
@@ -62,6 +65,8 @@ def make_zip(name: str, *, background: bool = True, cover: bool = True, ambient:
             manifest["cover"] = "assets/cover.png"
         if ambient:
             manifest["ambient"] = "audio/rain.mp3"
+        if video:
+            manifest["backgroundVideo"] = "assets/loop.webm"
         archive.writestr("theme.json", json.dumps(manifest, ensure_ascii=False))
         if background:
             archive.writestr("assets/background.png", make_png(24, 8))
@@ -69,6 +74,8 @@ def make_zip(name: str, *, background: bool = True, cover: bool = True, ambient:
             archive.writestr("assets/cover.png", make_png(12, 4, (90, 110, 70)))
         if ambient:
             archive.writestr("audio/rain.mp3", make_mp3())
+        if video:
+            archive.writestr("assets/loop.webm", VIDEO)
     return buffer.getvalue()
 
 
@@ -86,6 +93,14 @@ def wait_service(base: str) -> None:
 
 def backdrop_style(page) -> str:
     return page.locator(".focus-backdrop").get_attribute("style") or ""
+
+
+def backdrop_class(page) -> str:
+    return page.locator(".focus-backdrop").get_attribute("class") or ""
+
+
+def saved_motion(page):
+    return page.evaluate("JSON.parse(localStorage.getItem('zhijing:motion') || 'null')")
 
 
 def saved_scene(page):
@@ -148,6 +163,25 @@ def run() -> None:
         assert loaded, "all six built-in covers should decode"
         page.screenshot(path=ROOT / ".dev/theme-panel-six.png", full_page=True)
 
+        # 1b. Limits hint and the persisted background-motion toggle.
+        expect(panel.get_by_text(re.compile("ZIP ≤ 32 MiB"))).to_be_visible()
+        toggle = panel.get_by_label("背景动效")
+        expect(toggle).to_be_checked()
+        assert "motion-" in backdrop_class(page), backdrop_class(page)
+        toggle.uncheck()
+        expect(page.locator(".focus-backdrop")).not_to_have_class(re.compile("motion-"))
+        assert saved_motion(page) is False
+        page.reload()
+        expect(page.get_by_role("heading", name="自习室")).to_be_visible()
+        assert "motion-" not in backdrop_class(page), backdrop_class(page)
+        assert saved_motion(page) is False
+        trigger = open_scenes(page, panel)
+        motion = panel.get_by_label("背景动效")
+        expect(motion).not_to_be_checked()
+        motion.check()
+        assert saved_motion(page) is True
+        assert "motion-" in backdrop_class(page), backdrop_class(page)
+
         # 2. Preview only covers the backdrop; applied theme stays until explicit apply.
         card(page, "morning").click()
         expect(panel.get_by_text(re.compile("正在预览：清晨书桌"))).to_be_visible()
@@ -194,6 +228,14 @@ def run() -> None:
         theme_id = custom.first.get_attribute("data-theme-id")
         assert theme_id and re.fullmatch(r"[a-f0-9]{12}", theme_id), theme_id
         expect(panel.get_by_text(re.compile("正在预览：合成主题包"))).to_be_visible()
+        expect(page.locator("video.scene-video")).to_have_count(1)
+        page.wait_for_function(
+            """() => {
+                const video = document.querySelector('video.scene-video');
+                return video && !video.paused && video.videoWidth > 0;
+            }""",
+            timeout=10000,
+        )
         page.get_by_role("button", name="应用此场景").click()
         expect(panel).to_be_hidden()
         assert saved_scene(page) == theme_id
@@ -205,7 +247,13 @@ def run() -> None:
             arg=f"/api/study/themes/{theme_id}/",
             timeout=10000,
         )
-        assert f"/api/study/themes/{theme_id}/" in backdrop_style(page), "custom scene should survive reload"
+        page.wait_for_function(
+            """() => {
+                const video = document.querySelector('video.scene-video');
+                return video && !video.paused && video.videoWidth > 0;
+            }""",
+            timeout=10000,
+        )
         page.screenshot(path=ROOT / ".dev/theme-applied.png", full_page=True)
 
         # 5. Duplicate upload reuses the existing card; invalid pack reports a reason.
@@ -223,8 +271,47 @@ def run() -> None:
         expect(panel.locator('[data-kind="custom"]')).to_have_count(1)
         page.screenshot(path=ROOT / ".dev/theme-panel-desktop.png", full_page=True)
 
+        # 5b. Rename the custom theme, export it, and verify motion/video interaction.
+        panel.locator('button[aria-label^="重命名主题"]').click()
+        rename_input = panel.get_by_label("主题名称")
+        expect(rename_input).to_be_visible()
+        expect(rename_input).to_be_focused()
+        rename_input.fill("动态主题改名")
+        rename_input.press("Enter")
+        expect(panel.get_by_text("动态主题改名", exact=True)).to_be_visible()
+        expect(panel.get_by_text(re.compile("已重命名"))).to_be_visible()
+        assert "动态主题改名" in trigger.get_attribute("aria-label")
+        export_path = ROOT / ".dev" / "theme-export.zip"
+        with page.expect_download() as download_info:
+            panel.locator('button[aria-label^="导出主题"]').click()
+        download = download_info.value
+        assert download.suggested_filename.endswith(".zip"), download.suggested_filename
+        download.save_as(export_path)
+        with zipfile.ZipFile(export_path) as pack:
+            names = set(pack.namelist())
+            exported = json.loads(pack.read("theme.json"))
+            assert exported["name"] == "动态主题改名", exported
+            assert exported["backgroundVideo"] == "assets/loop.webm", exported
+            for required in ("assets/background.png", "assets/cover.png", "audio/rain.mp3", "assets/loop.webm"):
+                assert required in names, names
+            assert ".archive-sha256" not in names
+        expect(panel.get_by_text(re.compile("已导出"))).to_be_visible()
+        export_path.unlink(missing_ok=True)
+        motion = panel.get_by_label("背景动效")
+        motion.uncheck()
+        expect(page.locator("video.scene-video")).to_have_count(0)
+        motion.check()
+        expect(page.locator("video.scene-video")).to_have_count(1)
+        page.wait_for_function(
+            "() => { const video = document.querySelector('video.scene-video'); return video && !video.paused; }",
+            timeout=10000,
+        )
+        page.keyboard.press("Escape")
+        expect(panel).to_be_hidden()
+
         # 6. Narrow screen: single column and no horizontal scroll.
         page.set_viewport_size({"width": 320, "height": 720})
+        trigger.click()
         expect(panel).to_be_visible()
         assert page.evaluate("document.documentElement.scrollWidth === window.innerWidth")
         assert grid_columns(page, panel) == 1, "320px scene grid should have 1 column"
@@ -306,11 +393,21 @@ def run() -> None:
         expect(panel.get_by_role("heading", name="选择场景")).to_be_visible()
         expect(panel.locator('[data-kind="custom"]')).to_have_count(0)
         page.keyboard.press("Escape")
+
+        # 12. Reduced motion turns the animated backdrop off.
+        reduced = browser.new_context(viewport={"width": 1366, "height": 900}, locale="zh-CN", reduced_motion="reduce")
+        reduced_page = reduced.new_page()
+        reduced_page.goto(URL)
+        expect(reduced_page.get_by_role("heading", name="自习室")).to_be_visible()
+        assert "motion-" not in (reduced_page.locator(".focus-backdrop").get_attribute("class") or "")
+        reduced.close()
+
         assert not errors, errors
         context.close()
         browser.close()
-        print("PASS themes: 6 builtins, preview/apply/reload, keyboard, ZIP import/duplicate/invalid, "
-              "320px, dark mode, ambient, timer/draft round trip, delete fallback")
+        print("PASS themes: 6 builtins, motion toggle/reduced-motion, preview/apply/reload, keyboard, "
+              "ZIP import/duplicate/invalid, video playback, rename/export, limits, 320px, dark mode, "
+              "ambient, timer/draft round trip, delete fallback")
 
 
 def main() -> None:

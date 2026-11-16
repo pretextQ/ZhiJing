@@ -29,6 +29,7 @@ PORT = "18129"
 BASE = f"http://127.0.0.1:{PORT}"
 ENV = os.environ | {"ZHIJING_DOCKER_PORT": PORT}
 COMPOSE = ["docker", "compose", "-f", "compose.yaml", "-p", PROJECT]
+VIDEO = (ROOT / "tests" / "fixtures" / "scene-loop.webm").read_bytes()
 
 
 def compose(*args: str) -> None:
@@ -54,10 +55,12 @@ def make_zip() -> bytes:
             "name": "Docker 合成主题",
             "background": "background.png",
             "cover": "cover.png",
+            "backgroundVideo": "loop.webm",
             "ambient": "rain.mp3",
         }, ensure_ascii=False))
         archive.writestr("background.png", make_png(24, 8))
         archive.writestr("cover.png", make_png(12, 4))
+        archive.writestr("loop.webm", VIDEO)
         archive.writestr("rain.mp3", (bytes([0xFF, 0xFB, 0x90, 0x00]) + b"\x00" * 413) * 80)
     return buffer.getvalue()
 
@@ -94,6 +97,13 @@ def main() -> None:
             theme_id = card["id"]
             assert card["name"] == "Docker 合成主题" and theme_id
             assert card["ambient_url"].endswith("rain.mp3")
+            assert card["background_video_url"].endswith("loop.webm")
+            limits = client.get(BASE + "/api/study/themes/limits")
+            assert limits.status_code == 200
+            assert limits.json() == {"max_archive_mb": 32, "max_expanded_mb": 64, "max_entries": 32}
+            video = client.get(BASE + card["background_video_url"])
+            assert video.status_code == 200 and video.headers["content-type"] == "video/webm"
+            assert video.content.startswith(b"\x1aE\xdf\xa3")
             duplicate = client.post(BASE + "/api/study/themes", content=archive,
                                     headers={"Content-Type": "application/zip"})
             assert duplicate.status_code == 200 and duplicate.json()["id"] == theme_id
@@ -102,7 +112,16 @@ def main() -> None:
             assert background.content.startswith(b"\x89PNG")
             ambient = client.get(BASE + card["ambient_url"])
             assert ambient.status_code == 200 and ambient.headers["content-type"] == "audio/mpeg"
-            print(f"PASS docker import: {theme_id} with background and ambient assets")
+            renamed = client.patch(BASE + f"/api/study/themes/{theme_id}", json={"name": "Docker 合成主题改名"})
+            assert renamed.status_code == 200 and renamed.json()["name"] == "Docker 合成主题改名", renamed.text
+            exported = client.get(BASE + f"/api/study/themes/{theme_id}/export")
+            assert exported.status_code == 200 and exported.headers["content-type"] == "application/zip"
+            assert "attachment" in exported.headers["content-disposition"]
+            with zipfile.ZipFile(io.BytesIO(exported.content)) as pack:
+                names = set(pack.namelist())
+                assert json.loads(pack.read("theme.json"))["name"] == "Docker 合成主题改名"
+                assert names == {"theme.json", "background.png", "cover.png", "loop.webm", "rain.mp3"}, names
+            print(f"PASS docker import: {theme_id} with background, video and ambient; rename and export")
 
             broken = io.BytesIO()
             with zipfile.ZipFile(broken, "w") as archive_file:
@@ -117,8 +136,11 @@ def main() -> None:
         with httpx.Client(timeout=20, trust_env=False) as client:
             recreated = themes(client)
             assert [item["id"] for item in recreated] == [theme_id], recreated
+            assert recreated[0]["name"] == "Docker 合成主题改名"
             background = client.get(BASE + card["background_url"])
             assert background.status_code == 200 and background.headers["content-type"] == "image/png"
+            video = client.get(BASE + card["background_video_url"])
+            assert video.status_code == 200 and video.headers["content-type"] == "video/webm"
             deleted = client.delete(BASE + f"/api/study/themes/{theme_id}")
             assert deleted.status_code == 204, deleted.text
             assert themes(client) == []

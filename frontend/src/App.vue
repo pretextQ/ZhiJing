@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ArrowLeft, ArrowUpRight, BookOpen, Headphones, Images, Moon, Sun, Trash2, Upload, X } from '@lucide/vue'
+import { ArrowLeft, ArrowUpRight, BookOpen, Download, Headphones, Images, Moon, Pencil, Sun, Trash2, Upload, X } from '@lucide/vue'
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watchEffect } from 'vue'
 import CourseWorkspace from './CourseWorkspace.vue'
 import FocusTimer from './FocusTimer.vue'
 import SoundPanel from './SoundPanel.vue'
 import { readLocal, writeLocal } from './preferences'
 import {
-  DEFAULT_THEME_ID, builtinThemes, findTheme, importTheme, listThemes, removeTheme, themeMessage, type Theme,
+  DEFAULT_THEME_ID, DEFAULT_THEME_LIMITS, builtinThemes, exportTheme, findTheme, getThemeLimits, importTheme,
+  listThemes, removeTheme, renameTheme, themeMessage, type Theme, type ThemeLimits,
 } from './themes'
 
 const savedScene = readLocal<string>('scene')
@@ -29,6 +30,29 @@ const deletingId = ref('')
 const confirmDeleteId = ref('')
 const sceneError = ref('')
 const sceneNotice = ref('')
+const sceneLimits = ref<ThemeLimits>({ ...DEFAULT_THEME_LIMITS })
+const motionEnabled = ref(readLocal<boolean>('motion') !== false)
+const reducedMotion = ref(false)
+const failedVideoUrl = ref('')
+const renamingId = ref('')
+const renameValue = ref('')
+const exportingId = ref('')
+const reduceMotionQuery = matchMedia('(prefers-reduced-motion: reduce)')
+const motionClass = computed(() => {
+  if (!motionEnabled.value || reducedMotion.value) return null
+  const current = viewTheme.value
+  if (!current.builtin || current.motion === 'none') return null
+  return current.motion === 'zoom' ? 'motion-zoom' : 'motion-drift'
+})
+const sceneVideoUrl = computed(() => {
+  if (!motionEnabled.value || reducedMotion.value) return null
+  const current = viewTheme.value
+  if (current.builtin || !current.backgroundVideoUrl) return null
+  return current.backgroundVideoUrl === failedVideoUrl.value ? null : current.backgroundVideoUrl
+})
+const limitsText = computed(() =>
+  `ZIP ≤ ${sceneLimits.value.maxArchiveMb} MiB · 解压 ≤ ${sceneLimits.value.maxExpandedMb} MiB · 最多 ${sceneLimits.value.maxEntries} 个文件`,
+)
 let toolTrigger: HTMLElement | undefined
 
 watchEffect(() => {
@@ -69,6 +93,8 @@ function applyScene() {
 }
 
 function askDelete(item: Theme) {
+  renamingId.value = ''
+  renameValue.value = ''
   confirmDeleteId.value = item.id
   clearSceneMessages()
 }
@@ -131,6 +157,88 @@ async function deleteTheme(item: Theme) {
   }
 }
 
+function syncReducedMotion() {
+  reducedMotion.value = reduceMotionQuery.matches
+}
+
+function toggleMotion() {
+  writeLocal('motion', motionEnabled.value)
+}
+
+function playSceneVideo(event: Event) {
+  void (event.target as HTMLVideoElement).play().catch(() => {})
+}
+
+function sceneVideoFailed() {
+  if (sceneVideoUrl.value) failedVideoUrl.value = sceneVideoUrl.value
+}
+
+async function loadLimits() {
+  sceneLimits.value = await getThemeLimits()
+}
+
+function startRename(item: Theme) {
+  confirmDeleteId.value = ''
+  clearSceneMessages()
+  renamingId.value = item.id
+  renameValue.value = item.name
+  void nextTick(() => {
+    const input = toolsPanel.value?.querySelector<HTMLInputElement>('input[aria-label="主题名称"]')
+    input?.focus()
+    input?.select()
+  })
+}
+
+function cancelRename() {
+  renamingId.value = ''
+  renameValue.value = ''
+}
+
+async function saveRename(item: Theme) {
+  if (renamingId.value !== item.id) return
+  const name = renameValue.value.trim()
+  renamingId.value = ''
+  renameValue.value = ''
+  if (!name || name === item.name) return
+  clearSceneMessages()
+  try {
+    const updated = await renameTheme(item.id, name)
+    customThemes.value = customThemes.value.map(theme => (theme.id === updated.id ? updated : theme))
+    if (preview.value?.id === updated.id) preview.value = updated
+    sceneNotice.value = `已重命名：${updated.name}`
+    void nextTick(() => {
+      toolsPanel.value?.querySelector<HTMLElement>(`[data-theme-id="${updated.id}"] .scene-pick`)?.focus()
+    })
+  } catch (error) {
+    sceneError.value = themeMessage(error)
+  }
+}
+
+async function exportThemeFile(item: Theme) {
+  if (exportingId.value) return
+  exportingId.value = item.id
+  renamingId.value = ''
+  renameValue.value = ''
+  clearSceneMessages()
+  try {
+    const { blob, filename } = await exportTheme(item.id, item.name)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.rel = 'noopener'
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 10000)
+    sceneNotice.value = `已导出：${filename}`
+  } catch (error) {
+    sceneError.value = themeMessage(error)
+  } finally {
+    exportingId.value = ''
+  }
+}
+
 function toggleTheme() {
   dark.value = !dark.value
   writeLocal('theme', dark.value ? 'dark' : 'light')
@@ -156,6 +264,8 @@ function navigate(event: MouseEvent, path: '/' | '/courses') {
 function closeTool(restoreFocus = true) {
   preview.value = null
   confirmDeleteId.value = ''
+  renamingId.value = ''
+  renameValue.value = ''
   clearSceneMessages()
   tool.value = null
   if (restoreFocus) toolTrigger?.focus()
@@ -169,6 +279,8 @@ function toggleTool(event: MouseEvent, id: 'scenes' | 'sound') {
   }
   preview.value = null
   confirmDeleteId.value = ''
+  renamingId.value = ''
+  renameValue.value = ''
   clearSceneMessages()
   toolTrigger = event.currentTarget as HTMLElement
   tool.value = id
@@ -182,6 +294,10 @@ function toggleTool(event: MouseEvent, id: 'scenes' | 'sound') {
 }
 
 function escapeTool() {
+  if (renamingId.value) {
+    cancelRename()
+    return
+  }
   if (!tool.value) return
   if (confirmDeleteId.value) {
     confirmDeleteId.value = ''
@@ -192,9 +308,15 @@ function escapeTool() {
 
 onMounted(() => {
   window.addEventListener('popstate', syncPage)
+  syncReducedMotion()
+  reduceMotionQuery.addEventListener('change', syncReducedMotion)
   void loadCustomThemes()
+  void loadLimits()
 })
-onUnmounted(() => window.removeEventListener('popstate', syncPage))
+onUnmounted(() => {
+  window.removeEventListener('popstate', syncPage)
+  reduceMotionQuery.removeEventListener('change', syncReducedMotion)
+})
 </script>
 
 <template>
@@ -202,10 +324,27 @@ onUnmounted(() => window.removeEventListener('popstate', syncPage))
     <div
       v-if="!inCourses"
       class="focus-backdrop"
+      :class="motionClass"
       :data-previewing="preview ? 'true' : undefined"
       :style="{ backgroundImage: 'url(' + viewTheme.backgroundUrl + ')' }"
       aria-hidden="true"
-    ></div>
+    >
+      <video
+        v-if="sceneVideoUrl"
+        :key="sceneVideoUrl"
+        class="scene-video"
+        :src="sceneVideoUrl"
+        :poster="viewTheme.backgroundUrl"
+        autoplay
+        muted
+        loop
+        playsinline
+        data-theme-video
+        aria-hidden="true"
+        @canplay="playSceneVideo"
+        @error="sceneVideoFailed"
+      ></video>
+    </div>
 
     <header class="topbar">
       <div class="topbar-inner">
@@ -312,6 +451,20 @@ onUnmounted(() => window.removeEventListener('popstate', syncPage))
           </ul>
         </section>
 
+        <div class="scene-motion">
+          <label class="scene-motion-toggle">
+            <input
+              v-model="motionEnabled"
+              type="checkbox"
+              aria-label="背景动效"
+              :title="reducedMotion ? '系统已开启减少动态效果，背景动效已停用' : '让场景背景缓慢平移或缩放'"
+              @change="toggleMotion"
+            >
+            <span>背景动效</span>
+          </label>
+          <span v-if="reducedMotion" class="scene-motion-note">系统已要求减少动态效果，动效已停用</span>
+        </div>
+
         <section class="scene-section" aria-labelledby="my-themes-title">
           <h3 id="my-themes-title" class="scene-heading">我的主题</h3>
           <p v-if="!customThemes.length" class="scene-empty">还没有导入主题，可从电脑选择 ZIP 主题包。</p>
@@ -337,27 +490,61 @@ onUnmounted(() => window.removeEventListener('popstate', syncPage))
               </button>
               <span v-if="appliedId === item.id" class="scene-badge">使用中</span>
               <span v-else-if="preview?.id === item.id" class="scene-badge">预览</span>
-              <button
-                v-if="confirmDeleteId !== item.id"
-                type="button"
-                class="scene-delete icon-button"
-                :aria-label="`删除主题 ${item.name}`"
-                title="删除主题"
-                @click="askDelete(item)"
-              ><Trash2 :size="15" aria-hidden="true" /></button>
-              <div v-else class="scene-confirm" role="group" :aria-label="`删除主题 ${item.name}`">
+              <div class="scene-tools">
+                <button
+                  type="button"
+                  class="icon-button scene-tool"
+                  :aria-label="`导出主题 ${item.name}`"
+                  title="导出主题包"
+                  :disabled="exportingId === item.id"
+                  @click="exportThemeFile(item)"
+                ><Download :size="15" aria-hidden="true" /></button>
+                <button
+                  type="button"
+                  class="icon-button scene-tool"
+                  :aria-label="`重命名主题 ${item.name}`"
+                  title="重命名主题"
+                  :disabled="renamingId === item.id"
+                  @click="startRename(item)"
+                ><Pencil :size="15" aria-hidden="true" /></button>
+                <button
+                  v-if="confirmDeleteId !== item.id"
+                  type="button"
+                  class="scene-delete icon-button"
+                  :aria-label="`删除主题 ${item.name}`"
+                  title="删除主题"
+                  @click="askDelete(item)"
+                ><Trash2 :size="15" aria-hidden="true" /></button>
+              </div>
+              <div v-if="confirmDeleteId === item.id" class="scene-confirm" role="group" :aria-label="`删除主题 ${item.name}`">
                 <span>删除这个主题？</span>
                 <button type="button" class="text-button scene-confirm-delete" :disabled="deletingId === item.id" @click="deleteTheme(item)">确认删除</button>
                 <button type="button" class="text-button" @click="cancelDelete">取消</button>
               </div>
+              <input
+                v-if="renamingId === item.id"
+                v-model="renameValue"
+                type="text"
+                class="scene-rename-input"
+                aria-label="主题名称"
+                maxlength="60"
+                autocomplete="off"
+                spellcheck="false"
+                @keydown.enter.prevent="saveRename(item)"
+                @keydown.esc.stop.prevent="cancelRename()"
+                @blur="saveRename(item)"
+              >
             </li>
           </ul>
         </section>
 
         <div class="scene-footer">
-          <button type="button" class="quiet-button scene-import" :disabled="importing" @click="themeFile?.click()">
-            <Upload :size="16" aria-hidden="true" /> {{ importing ? '正在导入…' : '导入主题包' }}
-          </button>
+          <div class="scene-import-area">
+            <button type="button" class="quiet-button scene-import" :disabled="importing" @click="themeFile?.click()">
+              <Upload :size="16" aria-hidden="true" /> {{ importing ? '正在导入…' : '导入主题包' }}
+            </button>
+            <p class="scene-limits">{{ limitsText }}</p>
+          </div>
           <div class="scene-apply">
             <span v-if="preview" class="scene-preview-status" role="status">正在预览：{{ preview.name }}</span>
             <button type="button" class="primary-button" :disabled="!canApply" @click="applyScene">应用此场景</button>

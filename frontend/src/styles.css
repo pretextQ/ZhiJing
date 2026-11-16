@@ -104,11 +104,51 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 }
 :root[data-theme="dark"] .focus-shell { --focus-glass: #101713e0; --focus-edge: #f5f9f043; }
 .focus-backdrop, .focus-backdrop::after { position: absolute; inset: 0; }
-.focus-backdrop { z-index: -1; background-size: cover; background-position: center 53%; }
+.focus-backdrop {
+  z-index: -1;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center 53%;
+  background-repeat: no-repeat;
+}
 .focus-backdrop::after {
   content: "";
+  z-index: 1;
   background: radial-gradient(ellipse at 50% 46%, #0b1511b2, transparent 70%),
     linear-gradient(180deg, #101a14a8, #101b1733 28%, #101b1729 65%, #101a14ad);
+}
+.scene-video {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 53%;
+}
+.focus-backdrop.motion-zoom {
+  background-size: auto 112%;
+  animation: backdrop-zoom 12s ease-in-out infinite alternate;
+}
+.focus-backdrop.motion-drift {
+  background-size: auto 120%;
+  background-position: 36% 44%;
+  animation: backdrop-drift 16s ease-in-out infinite alternate;
+}
+@keyframes backdrop-zoom {
+  from { background-size: auto 108%; }
+  to { background-size: auto 130%; }
+}
+@keyframes backdrop-drift {
+  from { background-position: 36% 44%; }
+  to { background-position: 64% 58%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .focus-backdrop.motion-zoom, .focus-backdrop.motion-drift {
+    animation: none;
+    background-size: cover;
+    background-position: center 53%;
+  }
 }
 :root[data-theme="dark"] .focus-backdrop { filter: brightness(.83); }
 .focus-shell .topbar { background: transparent; border-bottom: 1px solid #fbfff01a; }
@@ -292,6 +332,22 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   font-weight: 650;
   pointer-events: none;
 }
+.scene-tools {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: flex;
+  gap: 4px;
+}
+.scene-tools .icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.scene-tools .icon-button:hover { background: var(--surface-hover); color: var(--text); }
 .scene-delete {
   position: absolute;
   top: 7px;
@@ -303,7 +359,21 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   color: var(--text);
   box-shadow: var(--shadow);
 }
+.scene-tools .scene-delete { position: static; top: auto; right: auto; }
 .scene-delete:hover { background: var(--surface-hover); color: var(--error); }
+.scene-rename-input {
+  position: absolute;
+  inset: auto 6px 6px;
+  z-index: 3;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--focus);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--text);
+  font-weight: 650;
+  box-shadow: var(--shadow);
+}
 .scene-confirm {
   position: absolute;
   inset: auto 7px 7px;
@@ -329,6 +399,26 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   color: var(--muted);
   font-size: 13px;
 }
+.scene-motion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-top: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.scene-motion-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.scene-motion-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.scene-motion-note { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .scene-footer {
   position: sticky;
   bottom: 0;
@@ -343,6 +433,8 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   border-top: 1px solid var(--line);
   background: var(--paper);
 }
+.scene-import-area { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.scene-limits { margin: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .scene-apply { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-left: auto; }
 .scene-preview-status { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .scene-message { margin: 9px 0 0; }
@@ -361,7 +453,9 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .scene-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .scene-footer { flex-direction: column; align-items: stretch; margin-inline: -13px; padding: 12px 13px; }
   .scene-apply { justify-content: space-between; margin-left: 0; }
+  .scene-import-area { align-items: center; }
   .scene-import { justify-content: center; }
+  .scene-limits { text-align: center; }
 }
 
 .sound-bar {

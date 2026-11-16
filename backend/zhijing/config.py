@@ -27,3 +27,6 @@ class StudySettings(BaseSettings):
     database: Path = Path(".data/study.sqlite3")
     obsidian_dir: Path | None = None
     theme_dir: Path | None = None
+    theme_max_archive_mb: PositiveInt = 32
+    theme_max_expanded_mb: PositiveInt = 64
+    theme_max_entries: PositiveInt = 32

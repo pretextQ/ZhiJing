@@ -7,9 +7,9 @@ import secrets
 import shutil
 import threading
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from tempfile import mkdtemp
+from tempfile import mkdtemp, mkstemp
 from typing import Annotated
 from urllib.parse import quote
 
@@ -22,13 +22,13 @@ from .config import StudySettings
 PREFIX = "/api/study/themes"
 THEME_ID = re.compile(r"[0-9a-f]{12}")
 STAGING_PREFIX = ".staging-"
+TEMP_PREFIX = ".theme-"
 DIGEST_NAME = ".archive-sha256"
 MANIFEST_NAME = "theme.json"
-
-MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
-MAX_EXTRACTED_BYTES = 64 * 1024 * 1024
-MAX_ENTRIES = 32
 MAX_NAME_LENGTH = 60
+MAX_FILENAME_LENGTH = 60
+FALLBACK_FILENAME = "theme"
+MIB = 1024 * 1024
 
 IMAGE_TYPES = {
     "jpg": "image/jpeg",
@@ -36,7 +36,11 @@ IMAGE_TYPES = {
     "png": "image/png",
     "webp": "image/webp",
 }
+VIDEO_TYPES = {"webm": "video/webm", "mp4": "video/mp4"}
 AUDIO_TYPES = {"mp3": "audio/mpeg", "ogg": "audio/ogg"}
+UNSUPPORTED_IMAGE_SUFFIXES = {"gif", "bmp", "svg", "avif"}
+UNSUPPORTED_VIDEO_SUFFIXES = {"mov", "avi", "mkv", "flv", "m4v", "wmv"}
+UNSUPPORTED_AUDIO_SUFFIXES = {"wav", "flac", "m4a", "aac"}
 
 router = APIRouter(prefix=PREFIX, tags=["自习室"])
 
@@ -47,6 +51,13 @@ class ThemeCard(BaseModel):
     cover_url: str
     background_url: str
     ambient_url: str | None
+    background_video_url: str | None
+
+
+class ThemeLimits(BaseModel):
+    max_archive_mb: int
+    max_expanded_mb: int
+    max_entries: int
 
 
 @dataclass(frozen=True)
@@ -54,7 +65,12 @@ class ThemeManifest:
     name: str
     background: str
     cover: str | None = None
+    background_video: str | None = None
     ambient: str | None = None
+
+
+def mib_to_bytes(megabytes: int) -> int:
+    return megabytes * MIB
 
 
 def size_text(size: int) -> str:
@@ -91,7 +107,12 @@ def suffix_of(name: str) -> str:
 
 def media_type(name: str) -> str:
     suffix = suffix_of(name)
-    return IMAGE_TYPES.get(suffix) or AUDIO_TYPES.get(suffix) or "application/octet-stream"
+    return (
+        IMAGE_TYPES.get(suffix)
+        or VIDEO_TYPES.get(suffix)
+        or AUDIO_TYPES.get(suffix)
+        or "application/octet-stream"
+    )
 
 
 def is_symlink(info: zipfile.ZipInfo) -> bool:
@@ -105,6 +126,14 @@ def image_matches(suffix: str, data: bytes) -> bool:
         return data.startswith(b"\xff\xd8\xff")
     if suffix == "webp":
         return len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    return False
+
+
+def video_matches(suffix: str, data: bytes) -> bool:
+    if suffix == "webm":
+        return data.startswith(b"\x1aE\xdf\xa3")
+    if suffix == "mp4":
+        return len(data) >= 12 and data[4:8] == b"ftyp"
     return False
 
 
@@ -124,13 +153,19 @@ def check_media(name: str, data: bytes) -> None:
         if not image_matches(suffix, data):
             fail(f"图片文件内容与扩展名不匹配：{name}")
         return
+    if suffix in VIDEO_TYPES:
+        if not video_matches(suffix, data):
+            fail(f"视频文件内容与扩展名不匹配：{name}")
+        return
     if suffix in AUDIO_TYPES:
         if not audio_matches(suffix, data):
             fail(f"音频文件内容与扩展名不匹配：{name}")
         return
-    if suffix in {"gif", "bmp", "svg", "avif"}:
+    if suffix in UNSUPPORTED_IMAGE_SUFFIXES:
         fail(f"不支持的图片格式：{name}")
-    if suffix in {"wav", "flac", "m4a", "aac"}:
+    if suffix in UNSUPPORTED_VIDEO_SUFFIXES:
+        fail(f"不支持的视频格式：{name}")
+    if suffix in UNSUPPORTED_AUDIO_SUFFIXES:
         fail(f"不支持的音频格式：{name}")
     fail(f"不支持的素材格式：{name}")
 
@@ -162,13 +197,13 @@ def parse_manifest(raw: bytes) -> ThemeManifest:
     background = safe_path(background.strip())
 
     references: dict[str, str] = {}
-    for field in ("cover", "ambient"):
+    for field, target in (("cover", "cover"), ("ambient", "ambient"), ("backgroundVideo", "background_video")):
         value = data.get(field)
         if value is None:
             continue
         if not isinstance(value, str) or not value.strip():
             fail(f"主题包清单里的 {field} 必须是文件路径")
-        references[field] = safe_path(value.strip())
+        references[target] = safe_path(value.strip())
 
     return ThemeManifest(name=name, background=background, **references)
 
@@ -184,15 +219,15 @@ def read_entry(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes:
         fail("主题包内容损坏，无法读取")
 
 
-def inspect_archive(data: bytes) -> tuple[ThemeManifest, dict[str, bytes]]:
+def inspect_archive(data: bytes, *, max_entries: int, max_expanded_bytes: int) -> tuple[ThemeManifest, dict[str, bytes]]:
     try:
         archive = zipfile.ZipFile(io.BytesIO(data))
     except (zipfile.BadZipFile, ValueError, OSError):
         fail("主题包不是有效的 ZIP 文件")
     with archive:
         infos = archive.infolist()
-        if len(infos) > MAX_ENTRIES:
-            fail(f"主题包不能超过 {MAX_ENTRIES} 个文件")
+        if len(infos) > max_entries:
+            fail(f"主题包不能超过 {max_entries} 个文件")
         files: dict[str, zipfile.ZipInfo] = {}
         total = 0
         for info in infos:
@@ -208,8 +243,8 @@ def inspect_archive(data: bytes) -> tuple[ThemeManifest, dict[str, bytes]]:
             if name in files:
                 fail(f"主题包里有重名文件：{name}")
             total += info.file_size
-            if total > MAX_EXTRACTED_BYTES:
-                fail(f"主题包解压后不能超过 {size_text(MAX_EXTRACTED_BYTES)}")
+            if total > max_expanded_bytes:
+                fail(f"主题包解压后不能超过 {size_text(max_expanded_bytes)}")
             files[name] = info
 
         if MANIFEST_NAME not in files:
@@ -217,7 +252,12 @@ def inspect_archive(data: bytes) -> tuple[ThemeManifest, dict[str, bytes]]:
         manifest = parse_manifest(read_entry(archive, files[MANIFEST_NAME]))
 
         payloads: dict[str, bytes] = {}
-        for reference in (manifest.background, manifest.cover, manifest.ambient):
+        for reference in (
+            manifest.background,
+            manifest.cover,
+            manifest.background_video,
+            manifest.ambient,
+        ):
             if reference is None or reference in payloads:
                 continue
             if reference not in files:
@@ -240,13 +280,95 @@ def build_card(theme_id: str, manifest: ThemeManifest) -> ThemeCard:
         cover_url=asset_url(theme_id, manifest.cover) if manifest.cover else background,
         background_url=background,
         ambient_url=asset_url(theme_id, manifest.ambient) if manifest.ambient else None,
+        background_video_url=(
+            asset_url(theme_id, manifest.background_video) if manifest.background_video else None
+        ),
     )
+
+
+def normalized_name(value: object) -> str:
+    """Validate a user supplied theme name, returning the trimmed value."""
+    if not isinstance(value, str):
+        fail(f"主题名称需要 1 到 {MAX_NAME_LENGTH} 个字符")
+    name = value.strip()
+    if not 1 <= len(name) <= MAX_NAME_LENGTH:
+        fail(f"主题名称需要 1 到 {MAX_NAME_LENGTH} 个字符")
+    return name
+
+
+def manifest_json(manifest: ThemeManifest) -> str:
+    saved = {
+        "schemaVersion": 1,
+        "name": manifest.name,
+        "background": manifest.background,
+    }
+    if manifest.cover is not None:
+        saved["cover"] = manifest.cover
+    if manifest.background_video is not None:
+        saved["backgroundVideo"] = manifest.background_video
+    if manifest.ambient is not None:
+        saved["ambient"] = manifest.ambient
+    return json.dumps(saved, ensure_ascii=False, indent=2) + "\n"
+
+
+def write_manifest(directory: Path, manifest: ThemeManifest) -> None:
+    """Atomically replace theme.json inside an existing theme directory."""
+    descriptor, temporary = mkstemp(dir=directory, prefix=TEMP_PREFIX, suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(manifest_json(manifest))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, directory / MANIFEST_NAME)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
+
+
+def ascii_download_name(name: str) -> str:
+    """Build an ASCII fallback used inside the quoted Content-Disposition filename."""
+    cleaned = "".join(
+        char
+        for char in name
+        if 32 <= ord(char) < 127 and char not in {'"', "\\", "/", ":", "*", "?", "<", ">", "|"}
+    )
+    cleaned = cleaned.strip(" .")[:MAX_FILENAME_LENGTH].strip(" .")
+    return cleaned or FALLBACK_FILENAME
+
+
+def content_disposition(name: str) -> str:
+    fallback = ascii_download_name(name)
+    encoded = quote(f"{name}.zip", safe="")
+    return f'attachment; filename="{fallback}.zip"; filename*=UTF-8\'\'{encoded}'
 
 
 class ThemeStore:
     def __init__(self, settings: StudySettings):
         self.root = settings.theme_dir if settings.theme_dir is not None else settings.database.parent / "themes"
+        self.max_archive_mb = settings.theme_max_archive_mb
+        self.max_expanded_mb = settings.theme_max_expanded_mb
+        self.max_entries = settings.theme_max_entries
+        self.max_archive_bytes = mib_to_bytes(self.max_archive_mb)
+        self.max_expanded_bytes = mib_to_bytes(self.max_expanded_mb)
         self.lock = threading.Lock()
+
+    def limits(self) -> ThemeLimits:
+        return ThemeLimits(
+            max_archive_mb=self.max_archive_mb,
+            max_expanded_mb=self.max_expanded_mb,
+            max_entries=self.max_entries,
+        )
+
+    def theme_directory(self, theme_id: str, message: str = "找不到这个主题") -> Path:
+        if not THEME_ID.fullmatch(theme_id):
+            raise HTTPException(404, message)
+        directory = self.root / theme_id
+        if directory.is_symlink() or not directory.is_dir():
+            raise HTTPException(404, message)
+        return directory
 
     def cards(self) -> list[ThemeCard]:
         with self.lock:
@@ -283,8 +405,8 @@ class ThemeStore:
         return None
 
     def import_archive(self, data: bytes) -> ThemeCard:
-        if len(data) > MAX_ARCHIVE_BYTES:
-            raise HTTPException(413, f"主题包不能超过 {size_text(MAX_ARCHIVE_BYTES)}")
+        if len(data) > self.max_archive_bytes:
+            raise HTTPException(413, f"主题包不能超过 {size_text(self.max_archive_bytes)}")
         digest = hashlib.sha256(data).hexdigest()
         with self.lock:
             self.root.mkdir(parents=True, exist_ok=True)
@@ -294,25 +416,16 @@ class ThemeStore:
             staging = Path(mkdtemp(dir=self.root, prefix=STAGING_PREFIX))
             published = False
             try:
-                manifest, payloads = inspect_archive(data)
+                manifest, payloads = inspect_archive(
+                    data, max_entries=self.max_entries, max_expanded_bytes=self.max_expanded_bytes
+                )
                 for name, content in payloads.items():
                     destination = staging / name
                     if not destination.resolve().is_relative_to(staging.resolve()):
                         fail(f"主题包内的文件路径不安全：{name}")
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     destination.write_bytes(content)
-                saved = {
-                    "schemaVersion": 1,
-                    "name": manifest.name,
-                    "background": manifest.background,
-                }
-                if manifest.cover is not None:
-                    saved["cover"] = manifest.cover
-                if manifest.ambient is not None:
-                    saved["ambient"] = manifest.ambient
-                (staging / MANIFEST_NAME).write_text(
-                    json.dumps(saved, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-                )
+                write_manifest(staging, manifest)
                 (staging / DIGEST_NAME).write_text(digest + "\n", encoding="ascii")
                 theme_id = self.fresh_id()
                 os.replace(staging, self.root / theme_id)
@@ -328,31 +441,71 @@ class ThemeStore:
             if not (self.root / theme_id).exists():
                 return theme_id
 
-    def delete(self, theme_id: str) -> None:
-        if not THEME_ID.fullmatch(theme_id):
-            raise HTTPException(404, "找不到这个主题")
+    def rename(self, theme_id: str, value: object) -> ThemeCard:
+        name = normalized_name(value)
         with self.lock:
-            directory = self.root / theme_id
-            if directory.is_symlink() or not directory.is_dir():
+            directory = self.theme_directory(theme_id)
+            manifest = self.stored_manifest(directory)
+            if manifest is None:
                 raise HTTPException(404, "找不到这个主题")
+            updated = replace(manifest, name=name)
+            try:
+                write_manifest(directory, updated)
+            except OSError as error:
+                raise HTTPException(409, "无法重命名主题，请检查主题目录的权限") from error
+            return build_card(theme_id, updated)
+
+    def export(self, theme_id: str) -> tuple[str, bytes]:
+        with self.lock:
+            directory = self.theme_directory(theme_id)
+            manifest = self.stored_manifest(directory)
+            if manifest is None:
+                raise HTTPException(404, "找不到这个主题")
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr(MANIFEST_NAME, manifest_json(manifest))
+                seen = {MANIFEST_NAME}
+                for reference in (
+                    manifest.background,
+                    manifest.cover,
+                    manifest.background_video,
+                    manifest.ambient,
+                ):
+                    if reference is None or reference in seen:
+                        continue
+                    seen.add(reference)
+                    target = directory / reference
+                    if target.is_symlink() or not target.is_file():
+                        raise HTTPException(409, f"主题素材缺失，无法导出：{reference}")
+                    try:
+                        content = target.read_bytes()
+                    except OSError as error:
+                        raise HTTPException(409, f"无法读取主题素材：{reference}") from error
+                    archive.writestr(reference, content)
+            return manifest.name, buffer.getvalue()
+
+    def delete(self, theme_id: str) -> None:
+        with self.lock:
+            directory = self.theme_directory(theme_id)
             try:
                 shutil.rmtree(directory)
             except OSError as error:
                 raise HTTPException(409, "无法删除主题，请检查主题目录的权限") from error
 
     def asset(self, theme_id: str, asset_path: str) -> tuple[Path, str]:
-        if not THEME_ID.fullmatch(theme_id):
-            raise HTTPException(404, "找不到这个素材")
         with self.lock:
-            directory = self.root / theme_id
-            if directory.is_symlink() or not directory.is_dir():
-                raise HTTPException(404, "找不到这个素材")
+            directory = self.theme_directory(theme_id, "找不到这个素材")
             manifest = self.stored_manifest(directory)
             if manifest is None:
                 raise HTTPException(404, "找不到这个素材")
             allowed = {
                 name: media_type(name)
-                for name in (manifest.background, manifest.cover, manifest.ambient)
+                for name in (
+                    manifest.background,
+                    manifest.cover,
+                    manifest.background_video,
+                    manifest.ambient,
+                )
                 if name is not None
             }
             if asset_path not in allowed:
@@ -376,8 +529,8 @@ def require_local(request: Request, response: Response) -> ThemeStore:
 Store = Annotated[ThemeStore, Depends(require_local)]
 
 
-async def read_upload(request: Request) -> bytes:
-    limit = MAX_ARCHIVE_BYTES
+async def read_upload(request: Request, store: ThemeStore) -> bytes:
+    limit = store.max_archive_bytes
     body = bytearray()
     async for chunk in request.stream():
         body.extend(chunk)
@@ -393,9 +546,33 @@ def list_themes(store: Store) -> list[ThemeCard]:
     return store.cards()
 
 
+@router.get("/limits")
+def theme_limits(store: Store) -> ThemeLimits:
+    return store.limits()
+
+
 @router.post("")
 async def import_theme(request: Request, store: Store) -> ThemeCard:
-    return store.import_archive(await read_upload(request))
+    return store.import_archive(await read_upload(request, store))
+
+
+@router.patch("/{theme_id}")
+def rename_theme(theme_id: str, payload: dict, store: Store) -> ThemeCard:
+    return store.rename(theme_id, payload.get("name"))
+
+
+@router.get("/{theme_id}/export")
+def export_theme(theme_id: str, store: Store) -> Response:
+    name, archive = store.export(theme_id)
+    return Response(
+        content=archive,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": content_disposition(name),
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.delete("/{theme_id}", status_code=204)
