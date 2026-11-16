@@ -9,14 +9,9 @@ const { loadConfigFromFile } = await import(pathToFileURL(require.resolve('vite'
 
 export default async (env) => {
   const { config } = await loadConfigFromFile(env, resolve(frontend, 'vite.config.js'), frontend)
-  const spring = process.env.ZHIJING_SPRING_URL || 'http://127.0.0.1:18080'
-  const polish = process.env.ZHIJING_POLISH_BACKEND || 'spring'
-  if (!['spring', 'python'].includes(polish)) {
-    throw new Error('ZHIJING_POLISH_BACKEND must be spring or python')
-  }
-  const proxy = {}
-  if (polish === 'python') {
-    proxy['^/api/ai/polish-stream(?:\\?|$)'] = {
+  // Match the Python endpoint first. The historical editor uses LearnHub for its other APIs.
+  const proxy = {
+    '^/api/ai/polish-stream(?:\\?|$)': {
       target: process.env.ZHIJING_PYTHON_URL || 'http://127.0.0.1:18081',
       changeOrigin: true,
       configure(server) {
@@ -28,9 +23,12 @@ export default async (env) => {
           })
         })
       },
-    }
+    },
+    '/api': {
+      target: process.env.ZHIJING_SPRING_URL || 'http://127.0.0.1:18080',
+      changeOrigin: true,
+    },
   }
-  proxy['/api'] = { target: spring, changeOrigin: true }
   // Build the proxy map in match order. Merging the baseline map would leave /api first.
   const { server, preview, ...base } = config
   return {

@@ -1,5 +1,7 @@
 # 知径后端迁移计划
 
+> 历史试点计划。第 1、2 节已完成验收。知径现作为独立的 Python 个人学习工作台开发，请从 [项目 README](README.md) 启动。
+
 知径是 LearnHub 的后续项目，定位为个人知识工作台。新仓库是 `https://github.com/pretextQ/ZhiJing.git`，本地目录是 `D:\projects\ZhiJing`。对照项目在 `D:\projects\LearnHub`，编写计划时其 HEAD 为 `767b4aa`。以该版本的接口、前端和测试记录迁移基线。
 
 目标是把主后端逐步迁到 FastAPI。第一阶段交付一个能从现有 Vue 笔记编辑器操作的流式润色接口，后续按模块替换。首轮兼容方案沿用 MySQL、已有表结构、Flyway 迁移历史和上传文件布局。

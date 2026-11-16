@@ -75,7 +75,7 @@ def compare(client):
     print(f"PASS malformed JSON structure; identical diagnostic={bodies[0] == bodies[1]}")
 
 
-def proxy_test(client, base, mode):
+def proxy_test(client, base):
     call_count = len(client.get(MOCK + "/calls").json())
     # A slow upstream makes buffering observable while keeping this check independent of rendering.
     slow_note = NOTE + " 路由验收 合成慢请求"
@@ -99,15 +99,14 @@ def proxy_test(client, base, mode):
     assert [event for event, _ in frames] == ["progress", "progress", "done"]
     assert frames[-1][1] == {"content": slow_note.replace("合成原句", "合成润色句")}
     assert first_progress is not None
-    if mode == "python":
-        assert elapsed - first_progress > 5, (first_progress, elapsed)
-        assert response.headers["x-accel-buffering"] == "no"
+    assert elapsed - first_progress > 5, (first_progress, elapsed)
+    assert response.headers["x-accel-buffering"] == "no"
     calls = client.get(MOCK + "/calls").json()[call_count:]
     assert [(call["model"], call["state"]) for call in calls if call["text"] == slow_note] == [
-        (f"synthetic-{mode}", "complete")
+        ("synthetic-python", "complete")
     ]
     assert client.get(base + "/api/ai/status").json()["data"]["model"] == "synthetic-spring"
-    print(f"PASS {mode} Vite route: first progress {first_progress:.3f}s, done {elapsed:.3f}s")
+    print(f"PASS Python Vite route: first progress {first_progress:.3f}s, done {elapsed:.3f}s")
 
 
 def timeout_test(client):
@@ -124,7 +123,7 @@ def timeout_test(client):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["compare", "python", "spring", "timeout"])
+    parser.add_argument("mode", choices=["compare", "python", "timeout"])
     parser.add_argument("--proxy", default=PROXY)
     args = parser.parse_args()
     with httpx.Client(timeout=20, trust_env=False) as client:
@@ -133,4 +132,4 @@ if __name__ == "__main__":
         elif args.mode == "timeout":
             timeout_test(client)
         else:
-            proxy_test(client, args.proxy, args.mode)
+            proxy_test(client, args.proxy)

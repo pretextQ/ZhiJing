@@ -21,7 +21,7 @@ def wait_for_call(text, state):
     raise AssertionError(f"Mock did not report {state} for the synthetic note")
 
 
-def run(page, base, mode):
+def run(page, base):
     created = []
     run_id = uuid4().hex[:8]
 
@@ -58,9 +58,7 @@ def run(page, base, mode):
     dialog = page.locator(".el-dialog:visible")
 
     try:
-        actions = [("润色", "合成润色句")]
-        if mode == "python":
-            actions.append(("整理格式", "**合成排版句**"))
+        actions = [("润色", "合成润色句"), ("整理格式", "**合成排版句**")]
         for index, (action, replacement) in enumerate(actions):
             note_id, title = note(action, NOTE)
             open_note(note_id, title, first=index == 0)
@@ -76,10 +74,7 @@ def run(page, base, mode):
                                       and response.request.method == "PUT"):
                 editor().get_by_role("button", name="保存", exact=True).click()
             assert content(note_id) == NOTE.replace("合成原句", replacement)
-            print(f"PASS {mode} {action}: progress, preview, apply, explicit save", flush=True)
-
-        if mode == "spring":
-            return
+            print(f"PASS Python {action}: progress, preview, apply, explicit save", flush=True)
 
         cancel_text = f"{NOTE} {run_id} 合成慢请求"
         cancel_id, cancel_title = note("取消", cancel_text)
@@ -128,10 +123,9 @@ def run(page, base, mode):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["python", "spring"])
     parser.add_argument("--proxy", default="http://127.0.0.1:15174")
     args = parser.parse_args()
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path=os.getenv("ZHIJING_CHROMIUM_PATH"))
         page = browser.new_page(viewport={"width": 1500, "height": 1000})
-        run(page, args.proxy, args.mode)
+        run(page, args.proxy)
