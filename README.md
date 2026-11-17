@@ -12,7 +12,7 @@
 | `backend/zhijing/` | 模块化单体：`api/` 路由、`services/` 业务、`infra/` 数据库与文件、`domain/` 模型、`legacy/` 润色兼容层。 |
 | `frontend/src/` | Vue 3 + vue-router + Pinia；`views/`、`stores/`、`components/`、`styles/` 与生成的 `api/schema.d.ts`。 |
 | `tests/` | 数据库迁移、备份、自习室存储、主题包、导出和润色接口的回归测试。 |
-| `dev/`、`docs/` | 模拟模型、素材生成、备份/OpenAPI/验收脚本，以及开发计划和试点记录。 |
+| `dev/`、`docs/` | 模拟模型、素材生成、备份/恢复/OpenAPI/验收脚本，以及项目基调、主题包说明和历次实施记录。 |
 | `.github/workflows/ci.yml` | 后端 ruff + pytest、前端 lint/格式/单测/构建与 OpenAPI 类型一致性检查。 |
 
 ## 自习室 MVP
@@ -159,7 +159,7 @@ npm.cmd --prefix frontend run test:unit
 npm.cmd --prefix frontend run build
 ```
 
-Python 测试使用临时 SQLite 文件和合成主题包，无需启动外部数据库。备份与恢复各有一组回归用例（`tests/test_backup.py`、`tests/test_restore.py`），覆盖清单校验、路径穿越、覆盖前保留旧数据和恢复 CLI。CI 在 [.github/workflows/ci.yml](.github/workflows/ci.yml) 中执行同一组检查，并校验 OpenAPI 快照与生成的 TS 类型没有漂移。前期与 LearnHub 旧编辑器的兼容验证见 [试点记录](docs/learnhub-pilot.md)，主题包的制作和验收见 [场景与主题包](docs/theme-packs.md)。
+Python 测试使用临时 SQLite 文件和合成主题包，无需启动外部数据库。备份与恢复各有一组回归用例（`tests/test_backup.py`、`tests/test_restore.py`），覆盖清单校验、路径穿越、覆盖前保留旧数据和恢复 CLI。CI 在 [.github/workflows/ci.yml](.github/workflows/ci.yml) 中执行同一组检查，并校验 OpenAPI 快照与生成的 TS 类型没有漂移。前期与 LearnHub 旧编辑器的兼容验证见 [试点记录](docs/learnhub-pilot.md)，主题包的制作和验收见 [场景与主题包](docs/theme-packs.md)，历次交付的改动与验收输出见 [实施与验收记录](docs/implementation-records.md)。
 
 项目约定和两份 Markdown 技能源自 LearnHub `767b4aa`，相关材料适用 [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)。
 

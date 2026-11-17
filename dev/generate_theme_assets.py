@@ -2,7 +2,7 @@
 
 These assets are original synthetic paintings produced by this script. They are
 placeholders for the four new built-in scenes described in
-docs/development-plan.md and may be replaced by licensed photography later.
+docs/theme-packs.md and may be replaced by licensed photography later.
 Run with a Python that has Pillow and numpy:
 
     python dev/generate_theme_assets.py
