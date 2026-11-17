@@ -13,11 +13,11 @@
 
   /* 玻璃拟态：半透明本体 + 背景模糊 + 顶部高光细边 + 外投影。
      玻璃越"透"，越依赖 blur 与高光边来维持可读性，因此两者成对调节。 */
-  --room-glass: #0d171280;
-  --room-glass-raised: #0a120ea8;
-  --room-glass-veil: #08100c73;
-  --room-glass-blur: blur(24px) saturate(140%);
-  --room-glass-blur-light: blur(14px) saturate(125%);
+  --room-glass: #0d17125c;
+  --room-glass-raised: #0a120e8a;
+  --room-glass-veil: #08100c5c;
+  --room-glass-blur: blur(16px) saturate(135%);
+  --room-glass-blur-light: blur(10px) saturate(120%);
   --room-glass-edge: inset 0 1px 0 #ffffff2e, inset 0 0 0 1px #ffffff0f;
   --room-glass-shadow: 0 1px 2px #040a062e, 0 18px 48px -12px #040a0675;
   --room-glass-shadow-raised: 0 2px 6px #040a0638, 0 28px 64px -16px #040a0685;
@@ -35,9 +35,9 @@
   --room-panel: #0b120eb8;
 
   /* 深色模式下场景更暗，玻璃略微提亮并加深投影，避免糊成一块。 */
-  --room-glass: #101c1690;
-  --room-glass-raised: #0b1410b5;
-  --room-glass-veil: #060d0a80;
+  --room-glass: #101c1673;
+  --room-glass-raised: #0b14109e;
+  --room-glass-veil: #060d0a66;
   --room-glass-edge: inset 0 1px 0 #ffffff24, inset 0 0 0 1px #ffffff0d;
   --room-glass-shadow: 0 1px 2px #0000003d, 0 20px 52px -12px #0000008a;
   --room-glass-shadow-raised: 0 2px 6px #00000047, 0 30px 70px -16px #00000099;
@@ -92,21 +92,23 @@
   animation: room-drift 26s ease-in-out infinite alternate;
 }
 
+/* 动效只做极小幅度的呼吸与平移，不靠放大制造纵深：
+   scale 越大，原图被裁掉的有效像素越多，观感越糊。 */
 @keyframes room-zoom {
   from {
     transform: scale(1);
   }
   to {
-    transform: scale(1.1);
+    transform: scale(1.02);
   }
 }
 
 @keyframes room-drift {
   from {
-    transform: scale(1.1) translateX(-2%);
+    transform: scale(1.02) translateX(-0.8%);
   }
   to {
-    transform: scale(1.1) translateX(2%);
+    transform: scale(1.02) translateX(0.8%);
   }
 }
 
@@ -121,10 +123,10 @@
 
 .focus-shell .topbar {
   flex: none;
-  background: #0a1310a8;
+  background: #0a13108a;
   border-color: #ffffff1a;
   box-shadow: inset 0 -1px 0 #ffffff0f;
-  backdrop-filter: blur(26px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(145%);
 }
 
 .focus-shell .topbar-inner,
