@@ -1,22 +1,16 @@
-import { CloudRain, Gamepad2, LibraryBig, Moon, Sailboat, Sunrise, TrainFront, Trees, Waves } from '@lucide/vue'
+import { CloudRain, Moon, Sunrise, Trees, Waves } from '@lucide/vue'
 import type { Component } from 'vue'
 import { API_BASE, errorDetail } from './api/http'
 import type { ThemeCardDto, ThemeLimitsDto } from './api/types'
 import animeLoop from './assets/anime-loop.mp4'
 import animePoster from './assets/anime-poster.jpg'
 import forest from './assets/forest.jpg'
-import library from './assets/library.jpg'
-import morning from './assets/morning.jpg'
 import palms from './assets/palms.jpg'
-import pixel from './assets/pixel.jpg'
-import rain from './assets/rain-room.jpg'
-import seaside from './assets/seaside.jpg'
-import train from './assets/train.jpg'
 import waterLoop from './assets/water-loop.mp4'
 import waterPoster from './assets/water-poster.jpg'
 import whitecat from './assets/whitecat.jpg'
 
-export type ThemeMotion = 'zoom' | 'drift' | 'rain' | 'none'
+export type ThemeMotion = 'zoom' | 'drift' | 'none'
 
 export interface Theme {
   id: string
@@ -57,72 +51,6 @@ export const builtinThemes: readonly Theme[] = [
     builtin: true,
     motion: 'drift',
     icon: Trees,
-  },
-  {
-    id: 'rain',
-    name: '雨窗',
-    backgroundUrl: rain,
-    coverUrl: rain,
-    backgroundVideoUrl: null,
-    ambientUrl: null,
-    builtin: true,
-    motion: 'rain',
-    icon: CloudRain,
-  },
-  {
-    id: 'library',
-    name: '夜间图书馆',
-    backgroundUrl: library,
-    coverUrl: library,
-    backgroundVideoUrl: null,
-    ambientUrl: null,
-    builtin: true,
-    motion: 'drift',
-    icon: LibraryBig,
-  },
-  {
-    id: 'morning',
-    name: '清晨书桌',
-    backgroundUrl: morning,
-    coverUrl: morning,
-    backgroundVideoUrl: null,
-    ambientUrl: null,
-    builtin: true,
-    motion: 'drift',
-    icon: Sunrise,
-  },
-  {
-    id: 'seaside',
-    name: '海边木屋',
-    backgroundUrl: seaside,
-    coverUrl: seaside,
-    backgroundVideoUrl: null,
-    ambientUrl: null,
-    builtin: true,
-    motion: 'zoom',
-    icon: Sailboat,
-  },
-  {
-    id: 'train',
-    name: '暮色列车',
-    backgroundUrl: train,
-    coverUrl: train,
-    backgroundVideoUrl: null,
-    ambientUrl: null,
-    builtin: true,
-    motion: 'drift',
-    icon: TrainFront,
-  },
-  {
-    id: 'pixel',
-    name: '像素夏夜',
-    backgroundUrl: pixel,
-    coverUrl: pixel,
-    backgroundVideoUrl: null,
-    ambientUrl: null,
-    builtin: true,
-    motion: 'none',
-    icon: Gamepad2,
   },
   {
     id: 'palms',

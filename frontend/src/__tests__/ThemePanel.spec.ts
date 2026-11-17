@@ -33,15 +33,9 @@ describe('ThemePanel', () => {
   it('renders the built-in cards, applied badge and default import limits', () => {
     const { wrapper } = mountPanel()
     const cards = wrapper.findAll('[data-theme-id]')
-    expect(cards).toHaveLength(11)
+    expect(cards).toHaveLength(5)
     expect(cards.map((card) => card.attributes('data-theme-id'))).toEqual([
       'forest',
-      'rain',
-      'library',
-      'morning',
-      'seaside',
-      'train',
-      'pixel',
       'palms',
       'whitecat',
       'water',
@@ -49,9 +43,9 @@ describe('ThemePanel', () => {
     ])
     expect(cards.every((card) => card.attributes('data-kind') === 'builtin')).toBe(true)
     expect(wrapper.get('[data-theme-id="forest"]').attributes('data-applied')).toBe('true')
-    expect(wrapper.get('[data-theme-id="rain"]').attributes('data-applied')).toBeUndefined()
+    expect(wrapper.get('[data-theme-id="palms"]').attributes('data-applied')).toBeUndefined()
     expect(wrapper.get('[data-theme-id="forest"] .scene-badge').text()).toBe('使用中')
-    expect(wrapper.text()).toContain('夜间图书馆')
+    expect(wrapper.text()).toContain('椰林夜海')
     expect(wrapper.text()).toContain('ZIP ≤ 32 MiB · 解压 ≤ 64 MiB · 最多 32 个文件')
     expect(wrapper.text()).toContain('还没有导入主题，可从电脑选择 ZIP 主题包。')
     const motion = wrapper.get('input[aria-label="背景动效"]')
@@ -61,15 +55,15 @@ describe('ThemePanel', () => {
 
   it('previews a card and applies the selection through the store', async () => {
     const { store, wrapper } = mountPanel()
-    await wrapper.get('[data-theme-id="morning"] .scene-pick').trigger('click')
-    expect(wrapper.text()).toContain('正在预览：清晨书桌')
-    expect(wrapper.get('[data-theme-id="morning"]').attributes('data-preview')).toBe('true')
-    expect(wrapper.get('[data-theme-id="morning"] .scene-badge').text()).toBe('预览')
+    await wrapper.get('[data-theme-id="palms"] .scene-pick').trigger('click')
+    expect(wrapper.text()).toContain('正在预览：椰林夜海')
+    expect(wrapper.get('[data-theme-id="palms"]').attributes('data-preview')).toBe('true')
+    expect(wrapper.get('[data-theme-id="palms"] .scene-badge').text()).toBe('预览')
     const apply = wrapper.get('.scene-apply .primary-button')
     expect(apply.attributes('disabled')).toBeUndefined()
     await apply.trigger('click')
-    expect(store.appliedId).toBe('morning')
-    expect(JSON.parse(localStorage.getItem('zhijing:scene') ?? 'null')).toBe('morning')
+    expect(store.appliedId).toBe('palms')
+    expect(JSON.parse(localStorage.getItem('zhijing:scene') ?? 'null')).toBe('palms')
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 

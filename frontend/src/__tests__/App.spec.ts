@@ -107,7 +107,7 @@ describe('App layout shell', () => {
     await nextTick()
     expect(wrapper.get('#room-tools').isVisible()).toBe(true)
     expect(wrapper.get('#room-tools').get('h2').text()).toBe('选择场景')
-    expect(wrapper.findAll('#room-tools [data-theme-id]')).toHaveLength(11)
+    expect(wrapper.findAll('#room-tools [data-theme-id]')).toHaveLength(5)
     expect(wrapper.get('#room-tools').text()).toContain('ZIP ≤ 32 MiB · 解压 ≤ 64 MiB · 最多 32 个文件')
     expect(document.activeElement?.classList.contains('scene-pick')).toBe(true)
 
@@ -123,16 +123,16 @@ describe('App layout shell', () => {
 
     await trigger.trigger('click')
     await nextTick()
-    await wrapper.get('[data-theme-id="morning"] .scene-pick').trigger('click')
-    expect(wrapper.get('#room-tools').text()).toContain('正在预览：清晨书桌')
+    await wrapper.get('[data-theme-id="palms"] .scene-pick').trigger('click')
+    expect(wrapper.get('#room-tools').text()).toContain('正在预览：椰林夜海')
     expect(wrapper.get('.focus-backdrop').attributes('data-previewing')).toBe('true')
 
     await wrapper.get('.scene-apply .primary-button').trigger('click')
     await nextTick()
-    expect(localStorage.getItem('zhijing:scene')).toBe('"morning"')
-    expect(wrapper.get('.focus-backdrop').attributes('style')).toContain('morning')
+    expect(localStorage.getItem('zhijing:scene')).toBe('"palms"')
+    expect(wrapper.get('.focus-backdrop').attributes('style')).toContain('palms')
     expect(wrapper.get('#room-tools').isVisible()).toBe(false)
-    expect(wrapper.get('.focus-dock button').attributes('aria-label')).toBe('切换场景，当前清晨书桌')
+    expect(wrapper.get('.focus-dock button').attributes('aria-label')).toBe('切换场景，当前椰林夜海')
   })
 
   it('keeps the running timer and goal when toggling immersive mode', async () => {

@@ -223,3 +223,30 @@ uv run --locked --no-sync python dev/verify_themes.py
 
 - 五款新素材的授权问题未解决；若要公开分发仓库，需先替换或摘除。
 - 场景面板现在有 11 张卡片、单屏放不下，滚动与分组尚未专门优化。
+## 场景瘦身（2026-11-17）
+
+按「只留自己提供的素材」的决定，删除原有六款内置场景，内置主题收敛为五款。
+
+### 交付内容
+
+- 移除：`rain`、`library`、`morning`、`seaside`、`train`、`pixel` 六款主题条目，以及对应的 `rain-room.jpg`、`rain.jpg`、`library.jpg`、`morning.jpg`、`seaside.jpg`、`train.jpg`、`pixel.jpg` 七张素材。
+- 移除雨窗专用动效：[RainWindow.vue](../frontend/src/components/RainWindow.vue)（canvas 雨滴）与 [App.vue](../frontend/src/App.vue) 中的挂载点；`ThemeMotion` 去掉 `'rain'`。`dev/generate_theme_assets.py` 保留，仍可用于重新生成合成插画。
+- 内置主题现在为 `forest`、`palms`、`whitecat`、`water`、`anime`，默认仍是 `forest`（森林小船）。
+- 测试与验收同步：单测的内置 ID 顺序、场景面板卡片数、预览用例改为 `palms`；[verify_themes.py](../dev/verify_themes.py) 的 `BUILTINS` 收敛为五项，删除雨滴 canvas 断言，减少动效改为断言视频不渲染。
+
+### 实际验证
+
+```text
+npm.cmd --prefix frontend run test:unit                39 passed
+npm.cmd --prefix frontend run lint                     eslint 0 error
+npm.cmd --prefix frontend run format:check             All matched files use Prettier code style
+npm.cmd --prefix frontend run build                    通过，dist 仅剩五款内置素材
+uv run --locked --no-sync python dev/verify_themes.py
+  PASS：5 builtins、动效开关与减少动效、预览/应用/刷新、键盘、ZIP 导入/重复/无效包、
+        视频播放、重命名/导出、限制提示、320px、深色、主题环境音、计时与课程草稿往返、删除回退
+```
+
+### 待验证与后续
+
+- 删掉的七张图仍留在 git 历史里；若要让仓库体积真正变小，需要重写历史，本次未做。
+- 内置场景只剩五款后，场景面板单屏可完整显示，不需要额外滚动处理。

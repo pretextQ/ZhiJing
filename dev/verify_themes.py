@@ -31,13 +31,8 @@ from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 URL = "http://127.0.0.1:18127"
-BUILTINS = [
-    "forest", "rain", "library", "morning", "seaside", "train", "pixel", "palms", "whitecat", "water", "anime",
-]
-BUILTIN_NAMES = [
-    "森林小船", "雨窗", "夜间图书馆", "清晨书桌", "海边木屋", "暮色列车", "像素夏夜",
-    "椰林夜海", "雨窗小猫", "水面治愈", "动画光斑",
-]
+BUILTINS = ["forest", "palms", "whitecat", "water", "anime"]
+BUILTIN_NAMES = ["森林小船", "椰林夜海", "雨窗小猫", "水面治愈", "动画光斑"]
 VIDEO_THEMES = {"water", "anime"}
 DEFAULT_SCENE = "forest"
 VIDEO = (ROOT / "tests" / "fixtures" / "scene-loop.webm").read_bytes()
@@ -168,7 +163,7 @@ def run() -> None:
         loaded = page.evaluate("""() => Array.from(document.querySelectorAll('#room-tools img'))
             .every(image => image.complete && image.naturalWidth > 0)""")
         assert loaded, "all built-in covers should decode"
-        page.screenshot(path=ROOT / ".dev/theme-panel-six.png", full_page=True)
+        page.screenshot(path=ROOT / ".dev/theme-panel.png", full_page=True)
 
         # 1b. Limits hint and the persisted background-motion toggle.
         expect(panel.get_by_text(re.compile("ZIP ≤ 32 MiB"))).to_be_visible()
@@ -191,30 +186,7 @@ def run() -> None:
         page.keyboard.press("Escape")
         expect(panel).to_be_hidden()
 
-        # 1c. The rain scene still animates on its canvas.
-        trigger = open_scenes(page, panel)
-        card(page, "rain").click()
-        page.get_by_role("button", name="应用此场景").click()
-        expect(panel).to_be_hidden()
-        rain = page.locator(".scene-rain")
-        expect(rain).to_be_visible()
-        previous_frame = rain.evaluate("(canvas) => canvas.toDataURL()")
-        page.wait_for_function(
-            "(previous) => document.querySelector('.scene-rain')?.toDataURL() !== previous",
-            arg=previous_frame,
-            polling=100,
-        )
-        # Turning motion off stops the canvas and restores the default scene afterwards.
-        trigger = open_scenes(page, panel)
-        panel.get_by_label("背景动效").uncheck()
-        expect(rain).to_have_count(0)
-        panel.get_by_label("背景动效").check()
-        expect(rain).to_be_visible()
-        card(page, DEFAULT_SCENE).click()
-        page.get_by_role("button", name="应用此场景").click()
-        expect(panel).to_be_hidden()
-
-        # 1d. Bundled video themes stay muted, loop, and fall back to the poster when motion is off.
+        # 1c. Bundled video themes stay muted, loop, and fall back to the poster when motion is off.
         trigger = open_scenes(page, panel)
         card(page, "water").click()
         page.get_by_role("button", name="应用此场景").click()
@@ -236,23 +208,22 @@ def run() -> None:
 
         # 2. Preview only covers the backdrop; applied theme stays until explicit apply.
         trigger = open_scenes(page, panel)
-        card(page, "morning").click()
-        expect(panel.get_by_text(re.compile("正在预览：清晨书桌"))).to_be_visible()
-        expect(rain).to_have_count(0)
-        assert "morning" in backdrop_style(page), backdrop_style(page)
+        card(page, "palms").click()
+        expect(panel.get_by_text(re.compile("正在预览：椰林夜海"))).to_be_visible()
+        assert "palms" in backdrop_style(page), backdrop_style(page)
         assert saved_scene(page) in (None, DEFAULT_SCENE)
         page.get_by_role("button", name="应用此场景").click()
         expect(panel).to_be_hidden()
-        assert saved_scene(page) == "morning"
-        assert "morning" in backdrop_style(page)
+        assert saved_scene(page) == "palms"
+        assert "palms" in backdrop_style(page)
         page.reload()
         expect(page.get_by_role("heading", name="自习室")).to_be_visible()
         page.wait_for_function(
-            "() => (document.querySelector('.focus-backdrop')?.getAttribute('style') || '').includes('morning')",
+            "() => (document.querySelector('.focus-backdrop')?.getAttribute('style') || '').includes('palms')",
             timeout=10000,
         )
-        assert "morning" in backdrop_style(page), "applied scene should survive reload"
-        assert "清晨书桌" in open_scenes(page, panel).get_attribute("aria-label")
+        assert "palms" in backdrop_style(page), "applied scene should survive reload"
+        assert "椰林夜海" in open_scenes(page, panel).get_attribute("aria-label")
         page.keyboard.press("Escape")
         expect(panel).to_be_hidden()
 
@@ -270,7 +241,7 @@ def run() -> None:
         page.keyboard.press("Escape")
         expect(panel).to_be_hidden()
         assert page.evaluate("() => (document.activeElement.getAttribute('aria-label') || '').includes('切换场景')")
-        assert saved_scene(page) == "morning"
+        assert saved_scene(page) == "palms"
 
         # 4. Import a synthetic theme pack and apply it.
         archive = make_zip("合成主题包")
@@ -432,7 +403,7 @@ def run() -> None:
         expect(page.get_by_role("textbox", name="课程笔记")).to_have_text(draft)
         page.get_by_role("link", name="返回自习室").click()
 
-        # 10. Delete the applied custom theme and fall back to rain.
+        # 10. Delete the applied custom theme and fall back to the default scene.
         trigger.click()
         expect(panel).to_be_visible()
         custom_card = panel.locator(f'[data-theme-id="{theme_id}"]')
@@ -457,13 +428,13 @@ def run() -> None:
         reduced_page.goto(URL)
         expect(reduced_page.get_by_role("heading", name="自习室")).to_be_visible()
         assert "motion-" not in (reduced_page.locator(".focus-backdrop").get_attribute("class") or "")
-        expect(reduced_page.locator(".scene-rain")).to_have_count(0)
+        expect(reduced_page.locator("video.scene-video")).to_have_count(0)
         reduced.close()
 
         assert not errors, errors
         context.close()
         browser.close()
-        print(f"PASS themes: {len(BUILTINS)} builtins, rain animation, motion toggle/reduced-motion, "
+        print(f"PASS themes: {len(BUILTINS)} builtins, motion toggle/reduced-motion, "
               "preview/apply/reload, keyboard, "
               "ZIP import/duplicate/invalid, video playback, rename/export, limits, 320px, dark mode, "
               "ambient, timer/draft round trip, delete fallback")

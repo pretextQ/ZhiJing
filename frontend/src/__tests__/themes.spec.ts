@@ -17,27 +17,9 @@ function jsonResponse(body: unknown, status = 200) {
 
 describe('builtin theme catalogue', () => {
   it('keeps the built-in themes in product order with stable ids', () => {
-    expect(builtinThemes.map((theme) => theme.id)).toEqual([
-      'forest',
-      'rain',
-      'library',
-      'morning',
-      'seaside',
-      'train',
-      'pixel',
-      'palms',
-      'whitecat',
-      'water',
-      'anime',
-    ])
+    expect(builtinThemes.map((theme) => theme.id)).toEqual(['forest', 'palms', 'whitecat', 'water', 'anime'])
     expect(builtinThemes.map((theme) => theme.name)).toEqual([
       '森林小船',
-      '雨窗',
-      '夜间图书馆',
-      '清晨书桌',
-      '海边木屋',
-      '暮色列车',
-      '像素夏夜',
       '椰林夜海',
       '雨窗小猫',
       '水面治愈',
@@ -57,8 +39,8 @@ describe('builtin theme catalogue', () => {
   })
 
   it('finds built-in and custom themes by id', () => {
-    expect(findTheme('rain')?.name).toBe('雨窗')
     expect(findTheme('forest')?.name).toBe('森林小船')
+    expect(findTheme('rain')).toBeUndefined()
     expect(findTheme('missing')).toBeUndefined()
     const custom = { ...builtinThemes[0], id: 'abc123abc123', name: '合成主题', builtin: false, icon: undefined }
     expect(findTheme('abc123abc123', [custom])?.name).toBe('合成主题')
