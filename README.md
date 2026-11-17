@@ -94,7 +94,7 @@ uv run --locked --no-sync uvicorn zhijing.main:app --app-dir backend --host 127.
 
 ```powershell
 uv run --locked --no-sync python dev/backup.py
-uv run --locked --no-sync python dev/backup.py --output D:ackupszhijing.zip
+uv run --locked --no-sync python dev/backup.py --output D:/backups/zhijing.zip
 ```
 
 Docker 版备份到数据卷，再复制到宿主机：
@@ -102,6 +102,23 @@ Docker 版备份到数据卷，再复制到宿主机：
 ```powershell
 docker compose exec -e PYTHONPATH=/app/backend zhijing python -m zhijing.backup --output /data/backups/zhijing.zip
 docker compose cp zhijing:/data/backups/zhijing.zip .
+```
+
+### 从备份恢复
+
+备份是自包含 ZIP（`manifest.json`、SQLite 快照和全部主题素材），可以直接恢复到任意数据目录。先查看内容，再决定是否覆盖：
+
+```powershell
+uv run --locked --no-sync python dev/restore.py D:/backups/zhijing.zip --inspect
+uv run --locked --no-sync python dev/restore.py D:/backups/zhijing.zip
+```
+
+恢复到当前数据目录时，如果里面已经有笔记，命令会拒绝执行并提示加 `--force`；加 `--force` 后原有数据库和主题目录会改名为 `<文件名>.pre-restore-<时间戳>` 保留在数据目录里，不会直接删除。恢复前请先停止正在运行的服务，恢复后重新启动即可。Docker 版可以先把备份复制进容器再执行：
+
+```powershell
+docker compose cp zhijing.zip zhijing:/data/restore.zip
+docker compose exec -e PYTHONPATH=/app/backend zhijing python -m zhijing.restore --inspect /data/restore.zip
+docker compose exec -e PYTHONPATH=/app/backend zhijing python -m zhijing.restore --force /data/restore.zip
 ```
 
 后端接口类型由 OpenAPI 生成到前端，修改接口后执行：
@@ -142,7 +159,7 @@ npm.cmd --prefix frontend run test:unit
 npm.cmd --prefix frontend run build
 ```
 
-Python 测试使用临时 SQLite 文件和合成主题包，无需启动外部数据库。CI 在 [.github/workflows/ci.yml](.github/workflows/ci.yml) 中执行同一组检查，并校验 OpenAPI 快照与生成的 TS 类型没有漂移。前期与 LearnHub 旧编辑器的兼容验证见 [试点记录](docs/learnhub-pilot.md)，主题包的制作和验收见 [场景与主题包](docs/theme-packs.md)。
+Python 测试使用临时 SQLite 文件和合成主题包，无需启动外部数据库。备份与恢复各有一组回归用例（`tests/test_backup.py`、`tests/test_restore.py`），覆盖清单校验、路径穿越、覆盖前保留旧数据和恢复 CLI。CI 在 [.github/workflows/ci.yml](.github/workflows/ci.yml) 中执行同一组检查，并校验 OpenAPI 快照与生成的 TS 类型没有漂移。前期与 LearnHub 旧编辑器的兼容验证见 [试点记录](docs/learnhub-pilot.md)，主题包的制作和验收见 [场景与主题包](docs/theme-packs.md)。
 
 项目约定和两份 Markdown 技能源自 LearnHub `767b4aa`，相关材料适用 [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)。
 

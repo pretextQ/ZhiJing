@@ -262,3 +262,31 @@ docker compose up -d --wait
 - 主题库排序与搜索、真实摄影素材替换、动态背景视频转码仍在范围外。
 - 旧 `zhijing` 容器需要更新时，在仓库根目录执行 `docker compose up -d --build`。
 
+## 功能完善补齐（2026-11-17）
+
+首页重做后对照功能清单补了三处缺口，均不改变产品形态。
+
+### 交付内容
+
+- 环境音记忆：[SoundPanel.vue](../frontend/src/components/SoundPanel.vue) 把所选环境音写入 `zhijing:noise`，刷新、跨页面往返和重启浏览器后恢复并继续播放；启动失败时清回静音，避免下次打开反复重试。
+- 备份恢复：[restore.py](../backend/zhijing/restore.py) 与 [dev/restore.py](../dev/restore.py) 校验 manifest、条目路径与 SQLite 完整性后，先在数据目录的临时目录解包，再替换数据库与主题目录；目标已有笔记时默认拒绝，加 `--force` 会把旧数据保留为 `.pre-restore-<时间戳>`。容器内可直接 `python -m zhijing.restore`。
+- 文档修正：[README](../README.md) 的备份路径示例此前含有被吞掉的 `\b` 转义，实际会写到当前目录；现改为 `D:/backups/zhijing.zip`，并补充「从备份恢复」一节与备份 / 恢复测试说明。
+
+### 实际验证
+
+```text
+uv run --locked --no-sync ruff check .                 All checks passed
+uv run --locked --no-sync pytest -q                    146 passed, 1 warning（原 135 项 + 恢复 11 项）
+npm.cmd --prefix frontend run lint                     eslint 0 error
+npm.cmd --prefix frontend run format:check             All matched files use Prettier code style
+npm.cmd --prefix frontend run test:unit                38 passed（原 35 项 + 环境音 3 项）
+npm.cmd --prefix frontend run build                    vue-tsc 与 vite build 通过
+```
+
+另外做了两组人工验收：本机 CLI 备份 → `--inspect` → 覆盖恢复，第二次恢复不带 `--force` 被正确拒绝；Docker 版把备份 `cp` 进容器后执行 `python -m zhijing.restore --force`，旧数据库与主题目录按时间戳保留，随后手工还原回测试前数据。浏览器端确认环境音选择写入 `localStorage`、刷新后保持「播放中」。
+
+### 待验证与后续
+
+- 恢复只针对备份 ZIP，不支持合并或选择性恢复单个主题；需要时从 `.pre-restore-*` 目录里手工取回。
+- 恢复期间需要手动停止服务，避免正在运行的进程仍持有旧数据库句柄。
+

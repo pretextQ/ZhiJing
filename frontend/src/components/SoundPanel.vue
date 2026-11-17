@@ -28,7 +28,9 @@ const noises = [
   { id: 'brown', label: '棕噪音' },
 ] as const
 type Noise = (typeof noises)[number]['id'] | 'theme'
-const noise = ref<Noise>('off')
+const NOISE_KEY = 'noise'
+const restoredNoise = readLocal<string>(NOISE_KEY)
+const noise = ref<Noise>(noises.some((item) => item.id === restoredNoise) ? (restoredNoise as Noise) : 'off')
 const ambientAudio = ref<HTMLAudioElement>()
 const ambientUrl = computed(() => props.theme?.ambientUrl ?? null)
 const noiseOptions = computed<{ id: Noise; label: string }[]>(() => {
@@ -98,7 +100,7 @@ async function playAmbient(change: number) {
   await nextTick()
   const element = ambientAudio.value
   if (!element || !ambientUrl.value) {
-    if (change === soundChange) noise.value = 'off'
+    if (change === soundChange) clearNoise('主题没有可用的环境音')
     return
   }
   element.volume = volume.value / 100
@@ -107,15 +109,18 @@ async function playAmbient(change: number) {
     await element.play()
   } catch {
     if (change !== soundChange) return
-    noise.value = 'off'
-    noiseError.value = '主题环境音无法播放'
+    clearNoise('主题环境音无法播放')
   }
 }
 
-async function changeNoise(event: Event) {
-  const kind = (event.target as HTMLSelectElement).value as Noise
-  const change = ++soundChange
-  noise.value = kind
+// A failed start must not keep "playing" in storage, otherwise the next visit retries forever.
+function clearNoise(message: string) {
+  noise.value = 'off'
+  writeLocal(NOISE_KEY, 'off')
+  noiseError.value = message
+}
+
+async function applyNoise(kind: Noise, change: number) {
   noiseError.value = ''
   stopNoise()
   ambientAudio.value?.pause()
@@ -140,9 +145,15 @@ async function changeNoise(event: Event) {
     source.start()
   } catch {
     if (change !== soundChange) return
-    noise.value = 'off'
-    noiseError.value = '环境音启动失败'
+    clearNoise('环境音启动失败')
   }
+}
+
+async function changeNoise(event: Event) {
+  const kind = (event.target as HTMLSelectElement).value as Noise
+  noise.value = kind
+  writeLocal(NOISE_KEY, kind)
+  await applyNoise(kind, ++soundChange)
 }
 
 watch(volume, (value) => {
@@ -155,7 +166,7 @@ watch(ambientUrl, (url) => {
   ambientAudio.value?.pause()
   if (noise.value !== 'theme') return
   if (!url) {
-    noise.value = 'off'
+    clearNoise('主题没有可用的环境音')
     return
   }
   void playAmbient(++soundChange)
@@ -163,8 +174,7 @@ watch(ambientUrl, (url) => {
 
 function ambientFailed() {
   if (noise.value !== 'theme') return
-  noise.value = 'off'
-  noiseError.value = '主题环境音无法播放'
+  clearNoise('主题环境音无法播放')
 }
 
 function selectTrackFromEvent(event: Event) {
@@ -281,6 +291,13 @@ onMounted(async () => {
     playlistError.value = '无法读取本地歌单'
   } finally {
     loading.value = false
+  }
+  // Resume the remembered ambience. A theme ambience needs the imported theme's URL,
+  // which may arrive later; the ambientUrl watch covers that case.
+  if (noise.value === 'theme' && ambientUrl.value) {
+    await playAmbient(++soundChange)
+  } else if (noise.value !== 'off' && noise.value !== 'theme') {
+    await applyNoise(noise.value, ++soundChange)
   }
 })
 
