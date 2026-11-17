@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowUpRight, BookOpen, Headphones, Images, Maximize, Minimi
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import RainWindow from './components/RainWindow.vue'
 import SoundPanel from './components/SoundPanel.vue'
 import ThemePanel from './components/ThemePanel.vue'
 import { readLocal, writeLocal } from './preferences'
@@ -146,6 +147,7 @@ function escapeTool(event: KeyboardEvent) {
       :style="{ backgroundImage: 'url(' + viewTheme.backgroundUrl + ')' }"
       aria-hidden="true"
     >
+      <RainWindow v-if="motionClass === 'motion-rain'" />
       <video
         v-if="sceneVideoUrl"
         :key="sceneVideoUrl"

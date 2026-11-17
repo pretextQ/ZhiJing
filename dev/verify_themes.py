@@ -168,8 +168,17 @@ def run() -> None:
         toggle = panel.get_by_label("背景动效")
         expect(toggle).to_be_checked()
         assert "motion-" in backdrop_class(page), backdrop_class(page)
+        rain = page.locator(".scene-rain")
+        expect(rain).to_be_visible()
+        previous_frame = rain.evaluate("(canvas) => canvas.toDataURL()")
+        page.wait_for_function(
+            "(previous) => document.querySelector('.scene-rain')?.toDataURL() !== previous",
+            arg=previous_frame,
+            polling=100,
+        )
         toggle.uncheck()
         expect(page.locator(".focus-backdrop")).not_to_have_class(re.compile("motion-"))
+        expect(rain).to_have_count(0)
         assert saved_motion(page) is False
         page.reload()
         expect(page.get_by_role("heading", name="自习室")).to_be_visible()
@@ -181,10 +190,12 @@ def run() -> None:
         motion.check()
         assert saved_motion(page) is True
         assert "motion-" in backdrop_class(page), backdrop_class(page)
+        expect(rain).to_be_visible()
 
         # 2. Preview only covers the backdrop; applied theme stays until explicit apply.
         card(page, "morning").click()
         expect(panel.get_by_text(re.compile("正在预览：清晨书桌"))).to_be_visible()
+        expect(rain).to_have_count(0)
         assert "morning" in backdrop_style(page), backdrop_style(page)
         assert saved_scene(page) in (None, "rain")
         page.get_by_role("button", name="应用此场景").click()
@@ -400,12 +411,13 @@ def run() -> None:
         reduced_page.goto(URL)
         expect(reduced_page.get_by_role("heading", name="自习室")).to_be_visible()
         assert "motion-" not in (reduced_page.locator(".focus-backdrop").get_attribute("class") or "")
+        expect(reduced_page.locator(".scene-rain")).to_have_count(0)
         reduced.close()
 
         assert not errors, errors
         context.close()
         browser.close()
-        print("PASS themes: 6 builtins, motion toggle/reduced-motion, preview/apply/reload, keyboard, "
+        print("PASS themes: 6 builtins, rain animation, motion toggle/reduced-motion, preview/apply/reload, keyboard, "
               "ZIP import/duplicate/invalid, video playback, rename/export, limits, 320px, dark mode, "
               "ambient, timer/draft round trip, delete fallback")
 

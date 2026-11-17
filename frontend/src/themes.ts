@@ -9,7 +9,7 @@ import rain from './assets/rain-room.jpg'
 import seaside from './assets/seaside.jpg'
 import train from './assets/train.jpg'
 
-export type ThemeMotion = 'zoom' | 'drift' | 'none'
+export type ThemeMotion = 'zoom' | 'drift' | 'rain' | 'none'
 
 export interface Theme {
   id: string
@@ -48,7 +48,7 @@ export const builtinThemes: readonly Theme[] = [
     backgroundVideoUrl: null,
     ambientUrl: null,
     builtin: true,
-    motion: 'zoom',
+    motion: 'rain',
     icon: CloudRain,
   },
   {

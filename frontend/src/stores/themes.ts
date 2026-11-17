@@ -44,7 +44,7 @@ export const useThemesStore = defineStore('themes', () => {
     if (!motionEnabled.value || reducedMotion.value) return null
     const current = viewTheme.value
     if (!current.builtin || current.motion === 'none') return null
-    return current.motion === 'zoom' ? 'motion-zoom' : 'motion-drift'
+    return `motion-${current.motion}` as const
   })
   const sceneVideoUrl = computed(() => {
     if (!motionEnabled.value || reducedMotion.value) return null
