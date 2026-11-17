@@ -30,22 +30,27 @@ const customTheme: Theme = {
 }
 
 describe('ThemePanel', () => {
-  it('renders the six built-in cards, applied badge and default import limits', () => {
+  it('renders the built-in cards, applied badge and default import limits', () => {
     const { wrapper } = mountPanel()
     const cards = wrapper.findAll('[data-theme-id]')
-    expect(cards).toHaveLength(6)
+    expect(cards).toHaveLength(11)
     expect(cards.map((card) => card.attributes('data-theme-id'))).toEqual([
+      'forest',
       'rain',
       'library',
       'morning',
       'seaside',
       'train',
       'pixel',
+      'palms',
+      'whitecat',
+      'water',
+      'anime',
     ])
     expect(cards.every((card) => card.attributes('data-kind') === 'builtin')).toBe(true)
-    expect(wrapper.get('[data-theme-id="rain"]').attributes('data-applied')).toBe('true')
-    expect(wrapper.get('[data-theme-id="library"]').attributes('data-applied')).toBeUndefined()
-    expect(wrapper.get('[data-theme-id="rain"] .scene-badge').text()).toBe('使用中')
+    expect(wrapper.get('[data-theme-id="forest"]').attributes('data-applied')).toBe('true')
+    expect(wrapper.get('[data-theme-id="rain"]').attributes('data-applied')).toBeUndefined()
+    expect(wrapper.get('[data-theme-id="forest"] .scene-badge').text()).toBe('使用中')
     expect(wrapper.text()).toContain('夜间图书馆')
     expect(wrapper.text()).toContain('ZIP ≤ 32 MiB · 解压 ≤ 64 MiB · 最多 32 个文件')
     expect(wrapper.text()).toContain('还没有导入主题，可从电脑选择 ZIP 主题包。')

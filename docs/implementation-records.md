@@ -193,3 +193,33 @@ npm.cmd --prefix frontend run build                    vue-tsc 与 vite build �
 - 恢复只针对备份 ZIP，不支持合并或选择性恢复单个主题；需要时从 `.pre-restore-*` 目录里手工取回。
 - 恢复期间需要手动停止服务，避免正在运行的进程仍持有旧数据库句柄。
 
+## 内置场景扩充（2026-11-17）
+
+按本机壁纸收藏新增五款内置场景，并把「森林小船」设为默认皮肤。
+
+### 交付内容
+
+- 素材：`forest.jpg`、`palms.jpg`、`whitecat.jpg` 由原图缩到 2400px 宽并以 quality 84 重编码；`water-loop.mp4`（2850×1604 → 1600×900，CRF 28）与 `anime-loop.mp4`（2884×2160@60 → 1600×900@24，CRF 30）为循环视频，配套 `water-poster.jpg`、`anime-poster.jpg` 作静态回退。
+- 代码：[themes.ts](../frontend/src/themes.ts) 新增 `palms`、`whitecat`、`water`、`anime` 四款，并把 `forest` 置于首位、`DEFAULT_THEME_ID` 改为 `forest`；[stores/themes.ts](../frontend/src/stores/themes.ts) 的 `sceneVideoUrl` 不再排除内置主题，内置视频与导入包视频走同一条静音循环路径。
+- 授权：[theme-packs.md](../docs/theme-packs.md) 已标注五款新素材来自本机壁纸收藏、来源与授权未核实，其中 `anime` 含第三方版权内容，仅建议本机自用。
+
+### 实际验证
+
+```text
+uv run --locked --no-sync ruff check .                 All checks passed
+npm.cmd --prefix frontend run lint                     eslint 0 error
+npm.cmd --prefix frontend run format:check             All matched files use Prettier code style
+npm.cmd --prefix frontend run test:unit                39 passed（原 38 项 + 默认皮肤 1 项）
+npm.cmd --prefix frontend run build                    vue-tsc 与 vite build 通过
+uv run --locked --no-sync python dev/verify_themes.py
+  PASS：11 款内置、雨滴动效、动效开关与减少动效、预览/应用/刷新、键盘、ZIP 导入/重复/无效包、
+        视频播放（含内置循环视频）、重命名/导出、限制提示、320px、深色、主题环境音、
+        计时与课程草稿往返、删除回退
+```
+
+浏览器端确认：默认进入即为「森林小船」，场景面板 3 列网格下 11 张卡片全部可解码，水面治愈应用后 `video.scene-video` 静音、循环、可播放且海报图为 `water-poster`。
+
+### 待验证与后续
+
+- 五款新素材的授权问题未解决；若要公开分发仓库，需先替换或摘除。
+- 场景面板现在有 11 张卡片、单屏放不下，滚动与分组尚未专门优化。

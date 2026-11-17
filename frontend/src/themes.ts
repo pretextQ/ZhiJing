@@ -1,13 +1,20 @@
-import { CloudRain, Gamepad2, LibraryBig, Sailboat, Sunrise, TrainFront } from '@lucide/vue'
+import { CloudRain, Gamepad2, LibraryBig, Moon, Sailboat, Sunrise, TrainFront, Trees, Waves } from '@lucide/vue'
 import type { Component } from 'vue'
 import { API_BASE, errorDetail } from './api/http'
 import type { ThemeCardDto, ThemeLimitsDto } from './api/types'
+import animeLoop from './assets/anime-loop.mp4'
+import animePoster from './assets/anime-poster.jpg'
+import forest from './assets/forest.jpg'
 import library from './assets/library.jpg'
 import morning from './assets/morning.jpg'
+import palms from './assets/palms.jpg'
 import pixel from './assets/pixel.jpg'
 import rain from './assets/rain-room.jpg'
 import seaside from './assets/seaside.jpg'
 import train from './assets/train.jpg'
+import waterLoop from './assets/water-loop.mp4'
+import waterPoster from './assets/water-poster.jpg'
+import whitecat from './assets/whitecat.jpg'
 
 export type ThemeMotion = 'zoom' | 'drift' | 'rain' | 'none'
 
@@ -34,12 +41,23 @@ export interface ExportedTheme {
   filename: string
 }
 
-export const DEFAULT_THEME_ID = 'rain'
+export const DEFAULT_THEME_ID = 'forest'
 
 /** Fallbacks mirror the backend defaults when GET /limits is unavailable. */
 export const DEFAULT_THEME_LIMITS: ThemeLimits = { maxArchiveMb: 32, maxExpandedMb: 64, maxEntries: 32 }
 
 export const builtinThemes: readonly Theme[] = [
+  {
+    id: 'forest',
+    name: '森林小船',
+    backgroundUrl: forest,
+    coverUrl: forest,
+    backgroundVideoUrl: null,
+    ambientUrl: null,
+    builtin: true,
+    motion: 'drift',
+    icon: Trees,
+  },
   {
     id: 'rain',
     name: '雨窗',
@@ -105,6 +123,50 @@ export const builtinThemes: readonly Theme[] = [
     builtin: true,
     motion: 'none',
     icon: Gamepad2,
+  },
+  {
+    id: 'palms',
+    name: '椰林夜海',
+    backgroundUrl: palms,
+    coverUrl: palms,
+    backgroundVideoUrl: null,
+    ambientUrl: null,
+    builtin: true,
+    motion: 'drift',
+    icon: Moon,
+  },
+  {
+    id: 'whitecat',
+    name: '雨窗小猫',
+    backgroundUrl: whitecat,
+    coverUrl: whitecat,
+    backgroundVideoUrl: null,
+    ambientUrl: null,
+    builtin: true,
+    motion: 'drift',
+    icon: CloudRain,
+  },
+  {
+    id: 'water',
+    name: '水面治愈',
+    backgroundUrl: waterPoster,
+    coverUrl: waterPoster,
+    backgroundVideoUrl: waterLoop,
+    ambientUrl: null,
+    builtin: true,
+    motion: 'none',
+    icon: Waves,
+  },
+  {
+    id: 'anime',
+    name: '动画光斑',
+    backgroundUrl: animePoster,
+    coverUrl: animePoster,
+    backgroundVideoUrl: animeLoop,
+    ambientUrl: null,
+    builtin: true,
+    motion: 'none',
+    icon: Sunrise,
   },
 ]
 

@@ -1,21 +1,28 @@
 # 场景与主题包
 
-知径内置六款自习室场景，也可以导入自己的 ZIP 主题包。本文说明内置素材来源、主题包格式（静态背景、动态视频、环境音）、导入/导出/重命名、可配置限制、接口和验收方法。历次交付的改动与验收记录见 [实施与验收记录](implementation-records.md)。
+知径内置十一款自习室场景，也可以导入自己的 ZIP 主题包。本文说明内置素材来源、主题包格式（静态背景、动态视频、环境音）、导入/导出/重命名、可配置限制、接口和验收方法。历次交付的改动与验收记录见 [实施与验收记录](implementation-records.md)。
 
 ## 一、内置主题
 
 | ID | 名称 | 素材 | 来源与授权 |
 | --- | --- | --- | --- |
+| `forest` | 森林小船（默认） | [forest.jpg](../frontend/src/assets/forest.jpg) | 素材来自本机壁纸收藏，来源与授权未核实，见下方说明 |
 | `rain` | 雨窗 | [rain-room.jpg](../frontend/src/assets/rain-room.jpg) | 项目 imagegen 生成，生成提示词见 [README](../README.md)「场景图和生成提示词」 |
 | `library` | 夜间图书馆 | [library.jpg](../frontend/src/assets/library.jpg) | 项目 imagegen 生成，生成提示词见 [README](../README.md)「场景图和生成提示词」 |
 | `morning` | 清晨书桌 | [morning.jpg](../frontend/src/assets/morning.jpg) | 项目原创合成插画，由 [generate_theme_assets.py](../dev/generate_theme_assets.py) 生成 |
 | `seaside` | 海边木屋 | [seaside.jpg](../frontend/src/assets/seaside.jpg) | 同上 |
 | `train` | 暮色列车 | [train.jpg](../frontend/src/assets/train.jpg) | 同上 |
 | `pixel` | 像素夏夜 | [pixel.jpg](../frontend/src/assets/pixel.jpg) | 同上 |
+| `palms` | 椰林夜海 | [palms.jpg](../frontend/src/assets/palms.jpg) | 素材来自本机壁纸收藏，来源与授权未核实 |
+| `whitecat` | 雨窗小猫 | [whitecat.jpg](../frontend/src/assets/whitecat.jpg) | 同上 |
+| `water` | 水面治愈 | [water-poster.jpg](../frontend/src/assets/water-poster.jpg) + [water-loop.mp4](../frontend/src/assets/water-loop.mp4) | 同上；视频由原素材转码而来 |
+| `anime` | 动画光斑 | [anime-poster.jpg](../frontend/src/assets/anime-poster.jpg) + [anime-loop.mp4](../frontend/src/assets/anime-loop.mp4) | 取自《BanG Dream!》相关同人壁纸，版权归原权利人，仅本机自用，不适合同步公开分发 |
 
-四张新图是可供发布的原创合成素材，不含第三方摄影或字体；随项目按 PolyForm Noncommercial License 1.0.0 发布。如需换成真实摄影，按 2172×724（约 3:1）的同名 JPEG 替换并重新构建前端即可。可运行 `python dev/generate_theme_assets.py` 重新生成（需要 Pillow 与 numpy）。
+> **授权提醒**：`morning`、`seaside`、`train`、`pixel` 四张图是可供发布的原创合成素材，不含第三方摄影或字体，随项目按 PolyForm Noncommercial License 1.0.0 发布。`forest`、`palms`、`whitecat`、`water`、`anime` 五款来自个人壁纸收藏，其中 `anime` 含有明确的第三方版权内容。若要把本仓库公开分发，建议先替换这五款素材，或在发布前把它们从 `builtinThemes` 中移除。知径是单人自用工具，本机使用不受影响。
 
-雨窗在窗景内叠加斜落的细雨和沿玻璃下滑的水滴。海边木屋缓慢缩放，夜间图书馆、清晨书桌和暮色列车缓慢平移，像素夏夜保持静止。可在场景面板关闭「背景动效」，系统开启减少动效时也会停用。
+如需换成自己的素材，JPEG 直接按同名替换后重新构建前端即可；内置主题的图片宽度建议 2400px 左右，静态图控制在 500 KiB 内。
+
+雨窗在窗景内叠加斜落的细雨和沿玻璃下滑的水滴。森林小船、椰林夜海和雨窗小猫缓慢平移；水面治愈与动画光斑在「背景动效」开启时静音循环播放内置视频，关闭动效或系统要求减少动效时回退到海报图；像素夏夜保持静止。
 
 ## 二、主题包格式
 
@@ -72,7 +79,7 @@ Compress-Archive -Path theme.json,cover.jpg,background.webp,loop.webm,rain.mp3 -
 2. 点击卡片预览：首页背景切换为预览图，当前已应用主题保留，卡片标记「预览」。
 3. 点击「应用此场景」保存选择并关闭面板，刷新后恢复；按 Escape 或关闭按钮放弃预览并回到已应用场景。
 4. 点击「导入主题包」选择 ZIP。导入成功后卡片出现在「我的主题」，并立即进入预览；失败时面板内显示具体原因。
-5. 自定义主题卡片可以重命名或导出为 ZIP；重命名只改卡片与清单里的名称，导出包含当前清单和全部引用素材，便于分享或备份。删除按钮需要二次确认；删除当前正在使用的主题后回到「雨窗」，删除其他主题不影响当前场景。
+5. 自定义主题卡片可以重命名或导出为 ZIP；重命名只改卡片与清单里的名称，导出包含当前清单和全部引用素材，便于分享或备份。删除按钮需要二次确认；删除当前正在使用的主题后回到默认的「森林小船」，删除其他主题不影响当前场景。
 6. 自定义主题环境音在「声音」面板的「环境音」下拉框中选择，音量与白噪音共用；本地歌单独立控制。主题包带动态背景视频时，视频在动效开启时静音循环播放；关闭「背景动效」或系统减少动效时显示静态背景。
 
 主题选择保存在浏览器 `localStorage` 的 `zhijing:scene`；自定义主题的文件保存在服务端 SQLite 数据目录，刷新页面或重建 Docker 容器都不会丢失（使用同名数据卷时）。
@@ -102,7 +109,7 @@ npm.cmd --prefix frontend run build
 uv run --locked --no-sync pytest -q
 ```
 
-浏览器验收会启动独立实例，检查六款内置场景、预览/应用/刷新恢复、键盘与 320px、ZIP 导入/重复导入/无效包、主题环境音播放、删除回退，以及看课笔记往返。首次使用先准备 Playwright（见 [仓库根目录 README](../README.md) 的测试说明）：
+浏览器验收会启动独立实例，检查十一款内置场景、预览/应用/刷新恢复、键盘与 320px、ZIP 导入/重复导入/无效包、主题环境音播放、删除回退，以及看课笔记往返。首次使用先准备 Playwright（见 [仓库根目录 README](../README.md) 的测试说明）：
 
 ```powershell
 uv pip install --target .dev/browser-deps playwright==1.65.2

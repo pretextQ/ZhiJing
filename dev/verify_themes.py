@@ -31,8 +31,15 @@ from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 URL = "http://127.0.0.1:18127"
-BUILTINS = ["rain", "library", "morning", "seaside", "train", "pixel"]
-BUILTIN_NAMES = ["雨窗", "夜间图书馆", "清晨书桌", "海边木屋", "暮色列车", "像素夏夜"]
+BUILTINS = [
+    "forest", "rain", "library", "morning", "seaside", "train", "pixel", "palms", "whitecat", "water", "anime",
+]
+BUILTIN_NAMES = [
+    "森林小船", "雨窗", "夜间图书馆", "清晨书桌", "海边木屋", "暮色列车", "像素夏夜",
+    "椰林夜海", "雨窗小猫", "水面治愈", "动画光斑",
+]
+VIDEO_THEMES = {"water", "anime"}
+DEFAULT_SCENE = "forest"
 VIDEO = (ROOT / "tests" / "fixtures" / "scene-loop.webm").read_bytes()
 
 
@@ -126,7 +133,7 @@ def open_scenes(page, panel):
     trigger.click()
     expect(panel).to_be_visible()
     expect(panel.get_by_role("heading", name="选择场景")).to_be_visible()
-    expect(panel.locator("[data-theme-id]")).to_have_count(6)
+    expect(panel.locator("[data-theme-id]")).to_have_count(len(BUILTINS))
     return trigger
 
 
@@ -152,7 +159,7 @@ def run() -> None:
         expect(page.get_by_role("heading", name="自习室")).to_be_visible()
         panel = page.locator("#room-tools")
 
-        # 1. Six built-in cards, desktop 3-column grid, theme images loaded.
+        # 1. Built-in cards, desktop 3-column grid, theme images loaded.
         trigger = open_scenes(page, panel)
         assert grid_columns(page, panel) == 3, "desktop scene grid should have 3 columns"
         for theme_id, name in zip(BUILTINS, BUILTIN_NAMES):
@@ -160,7 +167,7 @@ def run() -> None:
             assert name in card(page, theme_id).inner_text(), name
         loaded = page.evaluate("""() => Array.from(document.querySelectorAll('#room-tools img'))
             .every(image => image.complete && image.naturalWidth > 0)""")
-        assert loaded, "all six built-in covers should decode"
+        assert loaded, "all built-in covers should decode"
         page.screenshot(path=ROOT / ".dev/theme-panel-six.png", full_page=True)
 
         # 1b. Limits hint and the persisted background-motion toggle.
@@ -168,17 +175,8 @@ def run() -> None:
         toggle = panel.get_by_label("背景动效")
         expect(toggle).to_be_checked()
         assert "motion-" in backdrop_class(page), backdrop_class(page)
-        rain = page.locator(".scene-rain")
-        expect(rain).to_be_visible()
-        previous_frame = rain.evaluate("(canvas) => canvas.toDataURL()")
-        page.wait_for_function(
-            "(previous) => document.querySelector('.scene-rain')?.toDataURL() !== previous",
-            arg=previous_frame,
-            polling=100,
-        )
         toggle.uncheck()
         expect(page.locator(".focus-backdrop")).not_to_have_class(re.compile("motion-"))
-        expect(rain).to_have_count(0)
         assert saved_motion(page) is False
         page.reload()
         expect(page.get_by_role("heading", name="自习室")).to_be_visible()
@@ -190,14 +188,59 @@ def run() -> None:
         motion.check()
         assert saved_motion(page) is True
         assert "motion-" in backdrop_class(page), backdrop_class(page)
+        page.keyboard.press("Escape")
+        expect(panel).to_be_hidden()
+
+        # 1c. The rain scene still animates on its canvas.
+        trigger = open_scenes(page, panel)
+        card(page, "rain").click()
+        page.get_by_role("button", name="应用此场景").click()
+        expect(panel).to_be_hidden()
+        rain = page.locator(".scene-rain")
         expect(rain).to_be_visible()
+        previous_frame = rain.evaluate("(canvas) => canvas.toDataURL()")
+        page.wait_for_function(
+            "(previous) => document.querySelector('.scene-rain')?.toDataURL() !== previous",
+            arg=previous_frame,
+            polling=100,
+        )
+        # Turning motion off stops the canvas and restores the default scene afterwards.
+        trigger = open_scenes(page, panel)
+        panel.get_by_label("背景动效").uncheck()
+        expect(rain).to_have_count(0)
+        panel.get_by_label("背景动效").check()
+        expect(rain).to_be_visible()
+        card(page, DEFAULT_SCENE).click()
+        page.get_by_role("button", name="应用此场景").click()
+        expect(panel).to_be_hidden()
+
+        # 1d. Bundled video themes stay muted, loop, and fall back to the poster when motion is off.
+        trigger = open_scenes(page, panel)
+        card(page, "water").click()
+        page.get_by_role("button", name="应用此场景").click()
+        expect(panel).to_be_hidden()
+        video = page.locator("video.scene-video")
+        expect(video).to_have_count(1)
+        page.wait_for_function(
+            """() => {
+                const video = document.querySelector('video.scene-video');
+                return video && !video.paused && video.muted && video.loop && video.duration > 0;
+            }""",
+            timeout=15000,
+        )
+        assert "water-poster" in (video.get_attribute("poster") or ""), video.get_attribute("poster")
+        trigger = open_scenes(page, panel)
+        card(page, DEFAULT_SCENE).click()
+        page.get_by_role("button", name="应用此场景").click()
+        expect(panel).to_be_hidden()
 
         # 2. Preview only covers the backdrop; applied theme stays until explicit apply.
+        trigger = open_scenes(page, panel)
         card(page, "morning").click()
         expect(panel.get_by_text(re.compile("正在预览：清晨书桌"))).to_be_visible()
         expect(rain).to_have_count(0)
         assert "morning" in backdrop_style(page), backdrop_style(page)
-        assert saved_scene(page) in (None, "rain")
+        assert saved_scene(page) in (None, DEFAULT_SCENE)
         page.get_by_role("button", name="应用此场景").click()
         expect(panel).to_be_hidden()
         assert saved_scene(page) == "morning"
@@ -209,9 +252,12 @@ def run() -> None:
             timeout=10000,
         )
         assert "morning" in backdrop_style(page), "applied scene should survive reload"
-        assert "清晨书桌" in trigger.get_attribute("aria-label")
+        assert "清晨书桌" in open_scenes(page, panel).get_attribute("aria-label")
+        page.keyboard.press("Escape")
+        expect(panel).to_be_hidden()
 
         # 3. Keyboard: open focuses first card, Escape restores focus, nothing changes.
+        trigger = page.get_by_role("button", name=re.compile("切换场景"))
         trigger.focus()
         page.keyboard.press("Enter")
         expect(panel).to_be_visible()
@@ -220,7 +266,7 @@ def run() -> None:
             const card = active && active.closest('[data-theme-id]');
             return card ? card.dataset.themeId : '';
         }""")
-        assert focused == "rain", f"first card should receive focus, got {focused!r}"
+        assert focused == DEFAULT_SCENE, f"first card should receive focus, got {focused!r}"
         page.keyboard.press("Escape")
         expect(panel).to_be_hidden()
         assert page.evaluate("() => (document.activeElement.getAttribute('aria-label') || '').includes('切换场景')")
@@ -393,8 +439,8 @@ def run() -> None:
         custom_card.locator('button[aria-label^="删除主题"]').click()
         page.get_by_role("button", name="确认删除").click()
         expect(panel.locator('[data-kind="custom"]')).to_have_count(0)
-        assert saved_scene(page) == "rain"
-        assert "rain" in backdrop_style(page), backdrop_style(page)
+        assert saved_scene(page) == DEFAULT_SCENE
+        assert DEFAULT_SCENE in backdrop_style(page), backdrop_style(page)
         page.keyboard.press("Escape")
 
         # 11. The deleted theme is gone after reload as well.
@@ -417,7 +463,8 @@ def run() -> None:
         assert not errors, errors
         context.close()
         browser.close()
-        print("PASS themes: 6 builtins, rain animation, motion toggle/reduced-motion, preview/apply/reload, keyboard, "
+        print(f"PASS themes: {len(BUILTINS)} builtins, rain animation, motion toggle/reduced-motion, "
+              "preview/apply/reload, keyboard, "
               "ZIP import/duplicate/invalid, video playback, rename/export, limits, 320px, dark mode, "
               "ambient, timer/draft round trip, delete fallback")
 

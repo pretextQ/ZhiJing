@@ -49,7 +49,8 @@ export const useThemesStore = defineStore('themes', () => {
   const sceneVideoUrl = computed(() => {
     if (!motionEnabled.value || reducedMotion.value) return null
     const current = viewTheme.value
-    if (current.builtin || !current.backgroundVideoUrl) return null
+    // Built-in themes may ship a bundled loop; imported packs only when the manifest has one.
+    if (!current.backgroundVideoUrl) return null
     return current.backgroundVideoUrl === failedVideoUrl.value ? null : current.backgroundVideoUrl
   })
   const limitsText = computed(

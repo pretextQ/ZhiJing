@@ -63,7 +63,7 @@ describe('App layout shell', () => {
     expect(wrapper.get('#room-title').text()).toBe('自习室')
     expect(wrapper.find('.focus-backdrop').exists()).toBe(true)
     expect(wrapper.get('.course-entry').attributes('href')).toBe('/courses')
-    expect(wrapper.get('.focus-dock button').attributes('aria-label')).toBe('切换场景，当前雨窗')
+    expect(wrapper.get('.focus-dock button').attributes('aria-label')).toBe('切换场景，当前森林小船')
     expect(wrapper.get('#room-tools').isVisible()).toBe(false)
   })
 
@@ -107,7 +107,7 @@ describe('App layout shell', () => {
     await nextTick()
     expect(wrapper.get('#room-tools').isVisible()).toBe(true)
     expect(wrapper.get('#room-tools').get('h2').text()).toBe('选择场景')
-    expect(wrapper.findAll('#room-tools [data-theme-id]')).toHaveLength(6)
+    expect(wrapper.findAll('#room-tools [data-theme-id]')).toHaveLength(11)
     expect(wrapper.get('#room-tools').text()).toContain('ZIP ≤ 32 MiB · 解压 ≤ 64 MiB · 最多 32 个文件')
     expect(document.activeElement?.classList.contains('scene-pick')).toBe(true)
 
