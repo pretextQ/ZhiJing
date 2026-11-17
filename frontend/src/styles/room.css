@@ -3,8 +3,8 @@
 .course-shell,
 .room-sound {
   --room-text: #f2f0e9;
-  --room-muted: #b9c3ba;
-  --room-dim: #8c9a90;
+  --room-muted: #cdd8ce;
+  --room-dim: #b2c0b5;
   --room-accent: #cfe6d3;
   --room-accent-ink: #14231b;
   --room-line: #ffffff24;
@@ -13,13 +13,12 @@
   --room-hover: #2c3d33e0;
   --room-panel: #121b16b8;
 
-  /* 玻璃拟态：半透明本体 + 背景模糊 + 顶部高光细边 + 外投影。
-     玻璃越"透"，越依赖 blur 与高光边来维持可读性，因此两者成对调节。 */
-  --room-glass: #0d17125c;
+  /* 大面板保留场景细节，浮层用更强的模糊隔开背后的工作区。 */
+  --room-glass: #0d171252;
   --room-glass-raised: #0a120e8a;
   --room-glass-veil: #08100c5c;
-  --room-glass-blur: blur(16px) saturate(135%);
-  --room-glass-blur-light: blur(10px) saturate(120%);
+  --room-glass-blur: blur(2px);
+  --room-glass-blur-raised: blur(8px);
   --room-glass-edge: inset 0 1px 0 #ffffff2e, inset 0 0 0 1px #ffffff0f;
   --room-glass-shadow: 0 1px 2px #040a062e, 0 18px 48px -12px #040a0675;
   --room-glass-shadow-raised: 0 2px 6px #040a0638, 0 28px 64px -16px #040a0685;
@@ -37,7 +36,7 @@
   --room-panel: #0b120eb8;
 
   /* 深色模式下场景更暗，玻璃略微提亮并加深投影，避免糊成一块。 */
-  --room-glass: #101c1673;
+  --room-glass: #101c1666;
   --room-glass-raised: #0b14109e;
   --room-glass-veil: #060d0a66;
   --room-glass-edge: inset 0 1px 0 #ffffff24, inset 0 0 0 1px #ffffff0d;
@@ -125,10 +124,10 @@
 
 .focus-shell .topbar {
   flex: none;
-  background: #0a13108a;
+  background: var(--room-glass-veil);
   border-color: #ffffff1a;
   box-shadow: inset 0 -1px 0 #ffffff0f;
-  backdrop-filter: blur(18px) saturate(145%);
+  backdrop-filter: var(--room-glass-blur-raised);
 }
 
 .focus-shell .topbar-inner,
@@ -277,12 +276,11 @@
   border-radius: 7px;
   background: var(--room-glass-veil);
   box-shadow: inset 0 1px 0 #ffffff1f;
-  backdrop-filter: var(--room-glass-blur-light);
+  backdrop-filter: var(--room-glass-blur-raised);
   color: var(--room-muted);
   font-size: 12px;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
-  backdrop-filter: blur(8px);
 }
 
 .focus-session {
@@ -301,6 +299,8 @@
 .timer-modes {
   display: flex;
   gap: 2px;
+  border-radius: 8px;
+  background: #050b0866;
 }
 
 .timer-modes button {
@@ -354,7 +354,10 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: var(--room-dim);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #050b0866;
+  color: var(--room-muted);
   font-size: 12px;
   letter-spacing: 0.16em;
 }
@@ -703,7 +706,7 @@
   border-radius: var(--room-radius);
   background: var(--room-glass-raised);
   box-shadow: var(--room-glass-edge), var(--room-glass-shadow-raised);
-  backdrop-filter: var(--room-glass-blur);
+  backdrop-filter: var(--room-glass-blur-raised);
 }
 
 /* 工作区内：与左侧同高的静默侧栏，只有一条左分隔线。 */
@@ -719,6 +722,7 @@
   background: var(--room-glass);
   box-shadow: var(--room-glass-edge), var(--room-glass-shadow);
   backdrop-filter: var(--room-glass-blur);
+  text-shadow: 0 1px 3px #050b08cc;
 }
 
 .sound-heading {
@@ -938,7 +942,7 @@
   background: var(--room-glass-raised);
   color: var(--text);
   box-shadow: var(--room-glass-edge), var(--room-glass-shadow-raised);
-  backdrop-filter: var(--room-glass-blur);
+  backdrop-filter: var(--room-glass-blur-raised);
 }
 
 .tools-heading {
@@ -1000,7 +1004,7 @@
   border-radius: var(--room-radius);
   background: var(--room-glass-raised);
   box-shadow: var(--room-glass-edge), var(--room-glass-shadow-raised);
-  backdrop-filter: var(--room-glass-blur);
+  backdrop-filter: var(--room-glass-blur-raised);
 }
 
 .room-immersive .timer-face {

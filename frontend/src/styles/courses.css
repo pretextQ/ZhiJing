@@ -9,17 +9,11 @@
   background: #101711;
 }
 
-.course-shell .focus-backdrop::after {
-  background:
-    linear-gradient(180deg, #060d0aa6 0%, #07100c33 24%, #0811094d 62%, #060d0ab3 100%),
-    radial-gradient(120% 85% at 50% 42%, transparent 44%, #060d0a66 100%);
-}
-
 .course-shell .topbar {
   background: var(--room-glass-veil);
   border-color: #ffffff1f;
   box-shadow: inset 0 -1px 0 #ffffff0f;
-  backdrop-filter: var(--room-glass-blur);
+  backdrop-filter: var(--room-glass-blur-raised);
 }
 
 .course-room {
@@ -82,6 +76,7 @@
   font-size: 17px;
   font-weight: 750;
   white-space: nowrap;
+  text-shadow: 0 1px 3px #050b08cc;
 }
 .panel-header h2 svg {
   color: var(--room-accent);
@@ -101,7 +96,7 @@
   align-items: center;
   gap: 8px;
   padding-inline: 10px;
-  background: #eef4ef0a;
+  background: #050b0866;
   border: 1px solid var(--room-line);
   border-radius: 9px;
   color: var(--room-muted);
@@ -123,6 +118,10 @@
   padding: 0;
   background: transparent;
   color: var(--room-text);
+}
+
+.course-shell input::placeholder {
+  color: var(--room-muted);
 }
 .link-field:focus-within,
 .stamp-field:focus-within {
@@ -152,7 +151,6 @@
   background: #eef4ef0f;
   border-color: var(--room-line);
   color: var(--room-text);
-  backdrop-filter: blur(10px) saturate(120%);
 }
 .quiet-button:hover {
   background: #eef4ef1f;
@@ -330,7 +328,7 @@
   overflow: hidden;
   border-radius: 10px;
   border: 1px solid var(--room-line);
-  background: #050b0833;
+  background: #050b0866;
 }
 .note-editor:focus-within {
   border-color: var(--room-accent);
