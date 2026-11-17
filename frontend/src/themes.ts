@@ -5,7 +5,7 @@ import type { ThemeCardDto, ThemeLimitsDto } from './api/types'
 import library from './assets/library.jpg'
 import morning from './assets/morning.jpg'
 import pixel from './assets/pixel.jpg'
-import rain from './assets/rain.jpg'
+import rain from './assets/rain-room.jpg'
 import seaside from './assets/seaside.jpg'
 import train from './assets/train.jpg'
 

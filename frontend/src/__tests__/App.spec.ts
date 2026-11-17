@@ -134,4 +134,58 @@ describe('App layout shell', () => {
     expect(wrapper.get('#room-tools').isVisible()).toBe(false)
     expect(wrapper.get('.focus-dock button').attributes('aria-label')).toBe('切换场景，当前清晨书桌')
   })
+
+  it('keeps the running timer and goal when toggling immersive mode', async () => {
+    const { wrapper } = await mountApp()
+    const trigger = wrapper.get('[aria-label="沉浸模式"]')
+    const timer = wrapper.get('[role="timer"]').element
+    await wrapper.get('[aria-label="本轮目标"]').setValue('读完合成练习')
+    await wrapper.get('.focus-start').trigger('click')
+    await trigger.trigger('click')
+    expect(wrapper.get('.app-shell').classes()).toContain('room-immersive')
+    expect(trigger.attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('[role="timer"]').element).toBe(timer)
+    expect(wrapper.get('.focus-start').text()).toBe('暂停')
+
+    await wrapper.get('.app-shell').trigger('keydown', { key: 'Escape' })
+    expect(trigger.attributes('aria-pressed')).toBe('false')
+    expect(document.activeElement).toBe(trigger.element)
+    expect(wrapper.get<HTMLInputElement>('[aria-label="本轮目标"]').element.value).toBe('读完合成练习')
+  })
+
+  it('records a recovered focus timer only once and excludes completed breaks', async () => {
+    const pastDeadline = Date.now() - 1
+    const saveExpired = (minutes: number, mode?: 'short') => {
+      localStorage.setItem(
+        'zhijing:focus-session',
+        JSON.stringify({ minutes, remaining: 1000, deadline: pastDeadline, mode }),
+      )
+    }
+    saveExpired(18)
+    const { wrapper } = await mountApp()
+    expect(wrapper.findAll('.stats-values dd').map((value) => value.text())).toEqual(['18', '1'])
+    expect(wrapper.get('[role="timer"]').text()).toBe('00:00')
+
+    saveExpired(5, 'short')
+    const { wrapper: restored } = await mountApp()
+    expect(restored.get('[role="timer"]').attributes('aria-label')).toBe('休息剩余时间')
+    expect(restored.findAll('.stats-values dd').map((value) => value.text())).toEqual(['18', '1'])
+
+    const { wrapper: reload } = await mountApp()
+    expect(reload.findAll('.stats-values dd').map((value) => value.text())).toEqual(['18', '1'])
+  })
+
+  it('restores a completed task and saves its removal', async () => {
+    const { wrapper } = await mountApp()
+    await wrapper.get('[aria-label="新待办"]').setValue('合成待办')
+    await wrapper.get('.task-form').trigger('submit')
+    await wrapper.get('.task-list input').setValue(true)
+    expect(wrapper.get('.task-card').text()).toContain('1 / 1 已完成')
+
+    const { wrapper: restored } = await mountApp()
+    expect(restored.get<HTMLInputElement>('.task-list input').element.checked).toBe(true)
+    await restored.get('[aria-label="删除待办：合成待办"]').trigger('click')
+    expect(restored.find('.task-list').exists()).toBe(false)
+    expect(localStorage.getItem('zhijing:study-tasks')).toBe('[]')
+  })
 })

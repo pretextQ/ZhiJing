@@ -1,8 +1,22 @@
 <script setup lang="ts">
-import { ChevronDown, Headphones, ListMusic, Plus, Trash2, Volume2, VolumeX } from '@lucide/vue'
+import {
+  AudioLines,
+  ChevronDown,
+  Disc3,
+  ListMusic,
+  Pause,
+  Play,
+  Plus,
+  SkipBack,
+  SkipForward,
+  Trash2,
+  Volume2,
+  VolumeX,
+} from '@lucide/vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { type Track, readTracks, saveTracks } from '../playlist'
 import { readLocal, writeLocal } from '../preferences'
+import { formatTime } from '../study'
 import type { Theme } from '../themes'
 
 const props = defineProps<{ theme?: Theme | null }>()
@@ -27,12 +41,18 @@ const tracks = shallowRef<Track[]>([])
 const trackId = ref('')
 const trackUrl = ref('')
 const audio = ref<HTMLAudioElement>()
+const playing = ref(false)
+const position = ref(0)
+const trackDuration = ref(0)
+const trackVolume = ref(readLocal<number>('track-volume') ?? 70)
 const fileInput = ref<HTMLInputElement>()
 const loading = ref(true)
 const updating = ref(false)
 const noiseError = ref('')
 const playlistError = ref('')
 const currentIndex = computed(() => tracks.value.findIndex((track) => track.id === trackId.value))
+const currentTrack = computed(() => tracks.value[currentIndex.value])
+const canSeek = computed(() => trackDuration.value > 0)
 let context: AudioContext | undefined
 let source: AudioBufferSourceNode | undefined
 let gain: GainNode | undefined
@@ -156,6 +176,9 @@ async function selectTrack(id: string, play = false) {
   const track = tracks.value.find((item) => item.id === id)
   if (trackId.value !== id || !trackUrl.value) {
     audio.value?.pause()
+    playing.value = false
+    position.value = 0
+    trackDuration.value = 0
     if (trackUrl.value) URL.revokeObjectURL(trackUrl.value)
     trackId.value = id
     trackUrl.value = track ? URL.createObjectURL(track.file) : ''
@@ -205,15 +228,50 @@ function removeTrack() {
   return updateTracks(next, next[Math.min(index, next.length - 1)]?.id ?? '')
 }
 
-function playNext() {
-  const next = tracks.value[(currentIndex.value + 1) % tracks.value.length]
+function stepTrack(offset: number) {
+  const count = tracks.value.length
+  const next = tracks.value[(currentIndex.value + offset + count) % count]
   if (next) {
     playlistError.value = ''
     void selectTrack(next.id, true)
   }
 }
 
+function handleTrackEnd() {
+  syncPlayback()
+  stepTrack(1)
+}
+
+function togglePlayback() {
+  if (!currentTrack.value || !audio.value) return
+  if (!audio.value.paused) {
+    audio.value.pause()
+    return
+  }
+  playlistError.value = ''
+  void selectTrack(currentTrack.value.id, true)
+}
+
+function syncPlayback() {
+  if (!audio.value) return
+  playing.value = !audio.value.paused && !audio.value.ended
+  position.value = audio.value.currentTime
+  trackDuration.value = Number.isFinite(audio.value.duration) ? audio.value.duration : 0
+}
+
+function seek(event: Event) {
+  if (!audio.value || !canSeek.value) return
+  audio.value.currentTime = (event.target as HTMLInputElement).valueAsNumber
+  syncPlayback()
+}
+
+watch(trackVolume, (value) => {
+  writeLocal('track-volume', value)
+  if (audio.value) audio.value.volume = value / 100
+})
+
 onMounted(async () => {
+  if (audio.value) audio.value.volume = trackVolume.value / 100
   try {
     tracks.value = await readTracks()
     const remembered = readLocal<string>('track')
@@ -236,56 +294,140 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="sound-bar" aria-label="声音设置">
-    <div class="sound-group ambience">
-      <span class="sound-icon"><Headphones :size="19" /></span>
-      <label for="noise-kind">环境音</label>
+  <div class="sound-bar">
+    <section class="room-card playlist" aria-labelledby="playlist-title">
+      <div class="room-card-heading">
+        <h3 id="playlist-title"><ListMusic :size="17" aria-hidden="true" /> 本地歌单</h3>
+        <button
+          type="button"
+          class="room-icon"
+          aria-label="添加音乐"
+          title="添加音乐"
+          :disabled="loading || updating"
+          @click="fileInput?.click()"
+        >
+          <Plus :size="18" aria-hidden="true" />
+        </button>
+      </div>
+      <div class="track-summary">
+        <div class="track-art" aria-hidden="true">
+          <img v-if="theme" :src="theme.coverUrl" alt="" />
+          <Disc3 :size="24" />
+        </div>
+        <div class="track-caption">
+          <strong :title="currentTrack?.file.name">{{
+            currentTrack?.file.name ?? (loading ? '正在读取歌单' : '还没有音乐')
+          }}</strong>
+          <span v-if="tracks.length">{{ tracks.length }} 首曲目</span>
+          <button v-else-if="!loading" type="button" class="track-add" :disabled="updating" @click="fileInput?.click()">
+            导入本地音频
+          </button>
+        </div>
+      </div>
+      <div class="track-timeline">
+        <input
+          type="range"
+          min="0"
+          :max="trackDuration || 1"
+          step="0.1"
+          :value="position"
+          :disabled="!canSeek"
+          aria-label="播放进度"
+          @input="seek"
+        />
+        <div>
+          <span>{{ formatTime(Math.floor(position)) }}</span><span>{{ formatTime(Math.floor(trackDuration)) }}</span>
+        </div>
+      </div>
+      <div class="track-controls">
+        <button
+          type="button"
+          class="room-icon"
+          aria-label="上一首"
+          :disabled="tracks.length < 2"
+          @click="stepTrack(-1)"
+        >
+          <SkipBack :size="17" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="room-icon music-play"
+          :aria-label="playing ? '暂停音乐' : '播放音乐'"
+          :disabled="!currentTrack"
+          @click="togglePlayback"
+        >
+          <Pause v-if="playing" :size="19" aria-hidden="true" />
+          <Play v-else :size="19" aria-hidden="true" />
+        </button>
+        <button type="button" class="room-icon" aria-label="下一首" :disabled="tracks.length < 2" @click="stepTrack(1)">
+          <SkipForward :size="17" aria-hidden="true" />
+        </button>
+      </div>
+      <div v-if="tracks.length" class="track-picker">
+        <span class="select-wrap">
+          <select aria-labelledby="playlist-title" :value="trackId" @change="selectTrackFromEvent">
+            <option v-for="track in tracks" :key="track.id" :value="track.id">{{ track.file.name }}</option>
+          </select>
+          <ChevronDown :size="14" aria-hidden="true" />
+        </span>
+        <button
+          type="button"
+          class="room-icon"
+          aria-label="移除当前曲目"
+          title="移除当前曲目"
+          :disabled="updating"
+          @click="removeTrack"
+        >
+          <Trash2 :size="16" aria-hidden="true" />
+        </button>
+      </div>
+      <div class="sound-volume">
+        <Volume2 :size="16" aria-hidden="true" />
+        <input
+          v-model.number="trackVolume"
+          type="range"
+          min="0"
+          max="100"
+          aria-label="音乐音量"
+          :disabled="!tracks.length"
+        />
+        <span>{{ trackVolume }}%</span>
+      </div>
+      <audio
+        ref="audio"
+        :src="trackUrl || undefined"
+        preload="metadata"
+        aria-label="本地歌单播放器"
+        hidden
+        @loadedmetadata="syncPlayback"
+        @timeupdate="syncPlayback"
+        @play="syncPlayback"
+        @pause="syncPlayback"
+        @ended="handleTrackEnd"
+        @error="trackUrl && (playlistError = '无法播放这首曲目，请检查音频格式')"
+      ></audio>
+      <input ref="fileInput" type="file" accept="audio/*,.flac,.opus" multiple hidden @change="importTracks" />
+      <p v-if="playlistError" class="sound-error" role="status">{{ playlistError }}</p>
+    </section>
+    <section class="room-card ambience">
+      <div class="room-card-heading">
+        <h3><AudioLines :size="17" aria-hidden="true" /> <label for="noise-kind">环境音</label></h3>
+        <span class="room-card-detail">{{ noise === 'off' ? '已关闭' : '播放中' }}</span>
+      </div>
       <span class="select-wrap">
         <select id="noise-kind" :value="noise" @change="changeNoise">
           <option v-for="item in noiseOptions" :key="item.id" :value="item.id">{{ item.label }}</option>
         </select>
         <ChevronDown :size="14" aria-hidden="true" />
       </span>
-      <div class="volume-control">
+      <div class="sound-volume">
         <VolumeX v-if="noise === 'off' || volume === 0" :size="16" aria-hidden="true" />
         <Volume2 v-else :size="16" aria-hidden="true" />
         <input v-model.number="volume" type="range" min="0" max="100" aria-label="环境音音量" />
+        <span>{{ volume }}%</span>
       </div>
-    </div>
-    <div class="sound-group playlist">
-      <span class="sound-icon"><ListMusic :size="19" /></span>
-      <label for="track-select">本地歌单</label>
-      <span v-if="tracks.length" class="select-wrap track-select">
-        <select id="track-select" :value="trackId" @change="selectTrackFromEvent">
-          <option v-for="track in tracks" :key="track.id" :value="track.id">{{ track.file.name }}</option>
-        </select>
-        <ChevronDown :size="14" aria-hidden="true" />
-      </span>
-      <audio
-        v-show="tracks.length"
-        :src="trackUrl || undefined"
-        controls
-        preload="metadata"
-        aria-label="本地歌单播放器"
-        @ended="playNext"
-        @error="trackUrl && (playlistError = '无法播放这首曲目，请检查音频格式')"
-      ></audio>
-      <button
-        v-if="tracks.length"
-        type="button"
-        class="icon-button track-remove"
-        aria-label="移除当前曲目"
-        title="移除当前曲目"
-        :disabled="updating"
-        @click="removeTrack"
-      >
-        <Trash2 :size="16" aria-hidden="true" />
-      </button>
-      <button type="button" class="quiet-button add-audio" :disabled="loading || updating" @click="fileInput?.click()">
-        <Plus :size="17" aria-hidden="true" /> 添加音乐
-      </button>
-      <input ref="fileInput" type="file" accept="audio/*,.flac,.opus" multiple hidden @change="importTracks" />
-    </div>
+      <p v-if="noiseError" class="sound-error" role="status">{{ noiseError }}</p>
+    </section>
     <audio
       v-if="ambientUrl"
       ref="ambientAudio"
@@ -297,6 +439,5 @@ onBeforeUnmount(() => {
       hidden
       @error="ambientFailed"
     ></audio>
-    <p v-if="noiseError || playlistError" class="sound-error" role="status">{{ noiseError || playlistError }}</p>
-  </section>
+  </div>
 </template>

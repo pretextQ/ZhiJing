@@ -6,7 +6,7 @@
 
 | ID | 名称 | 素材 | 来源与授权 |
 | --- | --- | --- | --- |
-| `rain` | 雨窗 | [rain.jpg](../frontend/src/assets/rain.jpg) | 项目 imagegen 生成，生成提示词见 [README](../README.md)「场景图和生成提示词」 |
+| `rain` | 雨窗 | [rain-room.jpg](../frontend/src/assets/rain-room.jpg) | 项目 imagegen 生成，生成提示词见 [README](../README.md)「场景图和生成提示词」 |
 | `library` | 夜间图书馆 | [library.jpg](../frontend/src/assets/library.jpg) | 项目 imagegen 生成，生成提示词见 [README](../README.md)「场景图和生成提示词」 |
 | `morning` | 清晨书桌 | [morning.jpg](../frontend/src/assets/morning.jpg) | 项目原创合成插画，由 [generate_theme_assets.py](../dev/generate_theme_assets.py) 生成 |
 | `seaside` | 海边木屋 | [seaside.jpg](../frontend/src/assets/seaside.jpg) | 同上 |

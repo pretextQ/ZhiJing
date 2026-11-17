@@ -15,21 +15,25 @@
 
 ## 自习室 MVP
 
-1. 打开自习室即可开始专注。首页提供全屏场景、可设置时长的倒计时和本轮目标。底部可以在六款内置场景中选择，也可以导入 ZIP 主题包，播放环境音或本地歌单。计时、目标和歌单保存在当前浏览器中。
+1. 打开自习室即可开始专注。首页提供专注和休息计时、本轮目标、学习待办及今日专注统计。右侧独立调节本地音乐和环境音。顶栏可切换六款内置场景、导入 ZIP 主题包或开启沉浸模式，沉浸模式保留小计时器和场景、声音入口。计时、目标、待办、统计和歌单保存在当前浏览器中。
 2. 从右上角进入「看课笔记」，粘贴 B 站链接打开课程。常规视频支持分 P，课堂和番剧链接通过 B 站原页观看，也可以在知径记笔记。返回自习室后，专注计时和背景音继续运行。
 3. 边看边写 Markdown。输入时间点可插到光标处，可从笔记下方的时间点跳回视频，也可将其设为续播点。再次打开「看课笔记」时恢复最近课程、续播点和已保存的笔记。B 站外链没有公开读取当前进度的接口，续播点由用户设置。
 4. 笔记自动保存至本机 SQLite，支持下载 Markdown。要直接保存到 Obsidian，设置目标目录后点击「保存到 Obsidian」。如果同名文件的内容已被外部改动，知径会保留原文件。
 
 ## 场景与主题包
 
-首页底部的「场景」面板包含雨窗、夜间图书馆、清晨书桌、海边木屋、暮色列车和像素夏夜六款主题。内置场景带轻微的背景动效，可在面板中用「背景动效」开关关闭；系统开启减少动效时自动停用。点击卡片先预览，点「应用此场景」保存并关闭面板；按 Escape 放弃预览。
+点击首页顶栏的当前场景打开面板。面板包含雨窗、夜间图书馆、清晨书桌、海边木屋、暮色列车和像素夏夜六款主题。内置场景带轻微的背景动效，可在面板中用「背景动效」开关关闭；系统开启减少动效时自动停用。点击卡片先预览，点「应用此场景」保存并关闭面板；按 Escape 放弃预览。
 
 也可以导入 ZIP 主题包，在「我的主题」中重命名、导出或删除；主题包可以携带 WebM/MP4 动态背景视频和可选环境音，视频在动效开启时静音循环播放。主题包格式、视频与素材限制、素材来源与接口见 [场景与主题包](docs/theme-packs.md)。
 
 <details>
 <summary>场景图和生成提示词</summary>
 
-两幅场景图由内置 imagegen 生成，分别保存为 `frontend/src/assets/rain.jpg` 和 `frontend/src/assets/library.jpg`。
+当前「雨窗」的横屏背景为 `frontend/src/assets/rain-room.jpg`。原版雨窗和夜间图书馆场景图分别保存为 `frontend/src/assets/rain.jpg` 和 `frontend/src/assets/library.jpg`。这些场景图由内置 imagegen 生成。
+
+`rain-room.jpg`
+
+> Use case: photorealistic-natural. Create an original, wide 16:9 full-screen background for a calm personal study room web app. Eye-level from behind a walnut study desk, framed by an expansive rain-streaked picture window filling the entire upper two-thirds. Beyond the glass, layered dense evergreen forest recedes into a misty valley after a rain shower, with a little warm evening sunlight filtering through the clouds. A glowing vintage brass desk lamp on the left third, a small stack of books on the right third, a ceramic mug and open blank notebook. Keep the upper middle open and low contrast behind a circular timer overlay. Bottom quarter shows the desk surface with believable spatial depth. Cinematic natural editorial interior photography, crisp rain droplets, real wood grain, cool fern greens contrasted with gentle amber lamplight, atmospheric but sufficiently luminous and detailed. Full landscape framing with desk objects inset from the edges so they remain visible on desktop. Image only. No people, words, text, watermark, logos, or interface elements.
 
 `rain.jpg`
 
