@@ -61,10 +61,14 @@ describe('App layout shell', () => {
     const { wrapper } = await mountApp('/')
     expect(document.title).toBe('自习室 · 知径')
     expect(wrapper.get('#room-title').text()).toBe('自习室')
+    expect(wrapper.find('.brand').exists()).toBe(false)
     expect(wrapper.find('.focus-backdrop').exists()).toBe(true)
     expect(wrapper.get('.course-entry').attributes('href')).toBe('/courses')
     expect(wrapper.get('.focus-dock button').attributes('aria-label')).toBe('切换场景，当前森林小船')
     expect(wrapper.get('#room-tools').isVisible()).toBe(false)
+    expect(wrapper.get('#room-sound').isVisible()).toBe(false)
+    expect(wrapper.get('.room-activity').attributes('open')).toBeUndefined()
+    expect(wrapper.get('.focus-start').isVisible()).toBe(true)
   })
 
   it('navigates between room and courses with route titles, focus and KeepAlive state', async () => {
@@ -150,7 +154,9 @@ describe('App layout shell', () => {
     const trigger = wrapper.get('[aria-label="沉浸模式"]')
     const timer = wrapper.get('[role="timer"]').element
     await wrapper.get('[aria-label="本轮目标"]').setValue('读完合成练习')
+    expect(wrapper.find('.focus-session--running').exists()).toBe(false)
     await wrapper.get('.focus-start').trigger('click')
+    expect(wrapper.get('.focus-session--running [role="timer"]').element).toBe(timer)
     await trigger.trigger('click')
     expect(wrapper.get('.app-shell').classes()).toContain('room-immersive')
     expect(trigger.attributes('aria-pressed')).toBe('true')
@@ -161,6 +167,14 @@ describe('App layout shell', () => {
     expect(trigger.attributes('aria-pressed')).toBe('false')
     expect(document.activeElement).toBe(trigger.element)
     expect(wrapper.get<HTMLInputElement>('[aria-label="本轮目标"]').element.value).toBe('读完合成练习')
+
+    await wrapper.get('.focus-start').trigger('click')
+    expect(wrapper.find('.focus-session--running').exists()).toBe(false)
+    expect(wrapper.get('[role="timer"]').element).toBe(timer)
+    await wrapper.get('.focus-start').trigger('click')
+    expect(wrapper.get('.focus-session--running [role="timer"]').element).toBe(timer)
+    await wrapper.get('[aria-label="重置计时"]').trigger('click')
+    expect(wrapper.find('.focus-session--running').exists()).toBe(false)
   })
 
   it('records a recovered focus timer only once and excludes completed breaks', async () => {
@@ -187,15 +201,59 @@ describe('App layout shell', () => {
 
   it('restores a completed task and saves its removal', async () => {
     const { wrapper } = await mountApp()
+    await wrapper.get('.activity-trigger').trigger('click')
+    expect(wrapper.get('.room-activity').attributes('open')).toBeDefined()
     await wrapper.get('[aria-label="新待办"]').setValue('合成待办')
     await wrapper.get('.task-form').trigger('submit')
     await wrapper.get('.task-list input').setValue(true)
     expect(wrapper.get('.task-card').text()).toContain('1 / 1 已完成')
 
     const { wrapper: restored } = await mountApp()
+    await restored.get('.activity-trigger').trigger('click')
     expect(restored.get<HTMLInputElement>('.task-list input').element.checked).toBe(true)
     await restored.get('[aria-label="删除待办：合成待办"]').trigger('click')
     expect(restored.find('.task-list').exists()).toBe(false)
     expect(localStorage.getItem('zhijing:study-tasks')).toBe('[]')
+    await restored.get('[aria-label="新待办"]').trigger('keydown', { key: 'Escape' })
+    expect(restored.get('.room-activity').attributes('open')).toBeUndefined()
+    expect(document.activeElement).toBe(restored.get('.activity-trigger').element)
+  })
+
+  it('uses a task as the goal without restarting the timer or completing the task', async () => {
+    const { wrapper } = await mountApp()
+    await wrapper.get('.focus-start').trigger('click')
+    const deadline = JSON.parse(localStorage.getItem('zhijing:focus-session')!).deadline
+    await wrapper.get('.activity-trigger').trigger('click')
+    await wrapper.get('[aria-label="新待办"]').setValue('完成合成练习一')
+    await wrapper.get('.task-form').trigger('submit')
+    await wrapper.get('[aria-label="设为本轮目标：完成合成练习一"]').trigger('click')
+
+    expect(wrapper.get('.room-activity').attributes('open')).toBeUndefined()
+    const goal = wrapper.get<HTMLInputElement>('[aria-label="本轮目标"]')
+    expect(goal.element.value).toBe('完成合成练习一')
+    expect(document.activeElement).toBe(goal.element)
+    expect(wrapper.get('.focus-start').text()).toBe('暂停')
+    expect(JSON.parse(localStorage.getItem('zhijing:focus-session')!)).toMatchObject({
+      goal: '完成合成练习一',
+      deadline,
+    })
+    expect(wrapper.get<HTMLInputElement>('.task-list input').element.checked).toBe(false)
+
+    await goal.setValue('完成合成练习一并复盘')
+    expect(JSON.parse(localStorage.getItem('zhijing:focus-session')!).goal).toBe('完成合成练习一并复盘')
+  })
+
+  it('keeps breaks intact and does not offer completed tasks as a new goal', async () => {
+    const { wrapper } = await mountApp()
+    await wrapper.get('.activity-trigger').trigger('click')
+    await wrapper.get('[aria-label="新待办"]').setValue('合成复习任务')
+    await wrapper.get('.task-form').trigger('submit')
+    await wrapper.findAll('.timer-modes button')[1]!.trigger('click')
+    expect(wrapper.get<HTMLButtonElement>('.task-use-goal').element.disabled).toBe(true)
+    expect(wrapper.get('[role="timer"]').text()).toBe('05:00')
+    await wrapper.findAll('.timer-modes button')[0]!.trigger('click')
+    expect(wrapper.get<HTMLButtonElement>('.task-use-goal').element.disabled).toBe(false)
+    await wrapper.get('.task-list input').setValue(true)
+    expect(wrapper.find('.task-use-goal').exists()).toBe(false)
   })
 })

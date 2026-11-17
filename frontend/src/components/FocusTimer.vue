@@ -38,6 +38,7 @@ const remaining = ref(
 )
 const deadline = ref(saved && Number.isFinite(saved.deadline) ? saved.deadline : null)
 const goal = ref(typeof saved?.goal === 'string' ? saved.goal : '')
+const goalInput = ref<HTMLInputElement>()
 const running = computed(() => deadline.value !== null)
 const time = computed(() => formatTime(Math.ceil(remaining.value / 1000)))
 const rest = computed(() => mode.value !== 'focus')
@@ -120,6 +121,15 @@ function reset() {
   persist()
 }
 
+function setGoal(text: string) {
+  if (rest.value) return false
+  goal.value = text
+  goalInput.value?.focus()
+  return true
+}
+
+defineExpose({ setGoal, rest })
+
 watch(goal, persist, { flush: 'sync' })
 watch(
   running,
@@ -134,38 +144,17 @@ onUnmounted(() => window.clearInterval(interval))
 </script>
 
 <template>
-  <section class="focus-session" aria-label="番茄计时">
-    <div class="timer-modes" role="group" aria-label="计时模式">
-      <button
-        v-for="preset in presets"
-        :key="preset.id"
-        type="button"
-        :aria-pressed="mode === preset.id"
-        :disabled="running && mode !== preset.id"
-        @click="selectMode(preset.id)"
+  <section class="focus-session" :class="{ 'focus-session--running': running }" aria-label="番茄计时">
+    <div class="timer-face">
+      <div
+        class="focus-clock"
+        :class="{ 'focus-clock--long': time.length > 5 }"
+        role="timer"
+        :aria-label="rest ? '休息剩余时间' : '专注剩余时间'"
       >
-        {{ preset.label }}
-      </button>
-    </div>
-    <div class="timer-face" :style="{ '--timer-progress': progress }">
-      <span class="timer-caption" :class="{ 'is-running': running }">{{ status }}</span>
-      <div class="timer-ring">
-        <div class="focus-clock" role="timer" :aria-label="rest ? '休息剩余时间' : '专注剩余时间'">{{ time }}</div>
-        <div class="timer-progress" aria-hidden="true"></div>
+        {{ time }}
       </div>
-      <label class="focus-duration">
-        <input
-          type="number"
-          min="1"
-          max="180"
-          step="1"
-          :aria-label="rest ? '休息时长（分钟）' : '专注时长（分钟）'"
-          :disabled="running"
-          :value="minutes"
-          @change="changeDuration"
-        />
-        <span aria-hidden="true">分钟</span>
-      </label>
+      <span class="timer-caption">{{ status }}</span>
     </div>
     <div class="focus-timer-actions">
       <button type="button" class="focus-start" @click="toggle">
@@ -184,9 +173,44 @@ onUnmounted(() => window.clearInterval(interval))
         <RotateCcw :size="18" aria-hidden="true" />
       </button>
     </div>
+    <div class="timer-progress" :style="{ '--timer-progress': progress }" aria-hidden="true"></div>
+    <div class="timer-options">
+      <div class="timer-modes" role="group" aria-label="计时模式">
+        <button
+          v-for="preset in presets"
+          :key="preset.id"
+          type="button"
+          :aria-pressed="mode === preset.id"
+          :disabled="running && mode !== preset.id"
+          @click="selectMode(preset.id)"
+        >
+          {{ preset.label }}
+        </button>
+      </div>
+      <label class="focus-duration">
+        <input
+          type="number"
+          min="1"
+          max="180"
+          step="1"
+          :aria-label="rest ? '休息时长（分钟）' : '专注时长（分钟）'"
+          :disabled="running"
+          :value="minutes"
+          @change="changeDuration"
+        />
+        <span aria-hidden="true">分钟</span>
+      </label>
+    </div>
     <label v-show="!rest" class="timer-goal">
       <Target :size="17" aria-hidden="true" />
-      <input v-model="goal" type="text" maxlength="120" aria-label="本轮目标" placeholder="这一轮想完成什么？" />
+      <input
+        ref="goalInput"
+        v-model="goal"
+        type="text"
+        maxlength="120"
+        aria-label="本轮目标"
+        placeholder="这一轮想完成什么？"
+      />
     </label>
     <span v-if="!remaining" class="visually-hidden" role="status">{{ rest ? '本轮休息完成' : '本轮专注完成' }}</span>
   </section>

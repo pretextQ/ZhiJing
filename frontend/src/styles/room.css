@@ -50,9 +50,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100svh;
-  min-height: 560px;
-  overflow: hidden;
+  min-height: 100svh;
   background: #101711;
 }
 
@@ -77,6 +75,18 @@
   background:
     linear-gradient(180deg, #060d0a6b 0%, #07100c14 26%, #0811093d 62%, #060d0a85 100%),
     radial-gradient(120% 85% at 50% 42%, transparent 50%, #060d0a4d 100%);
+}
+
+.focus-shell .focus-backdrop::after {
+  background:
+    linear-gradient(180deg, #060d0a45, transparent 18%, transparent 70%, #060d0a63),
+    radial-gradient(ellipse at bottom left, #07120d45, transparent 55%);
+}
+
+:root[data-theme='dark'] .focus-shell .focus-backdrop::after {
+  background:
+    linear-gradient(180deg, #060d0a70, #060d0a18 28%, #060d0a18 65%, #060d0a99),
+    radial-gradient(ellipse at bottom left, #07120d66, transparent 55%);
 }
 
 .scene-video {
@@ -113,21 +123,21 @@
   }
 }
 
-:root[data-theme='dark'] .focus-backdrop {
+:root[data-theme='dark'] .course-shell .focus-backdrop {
   filter: brightness(0.79);
 }
 
 .focus-shell :is(button, a, select, input):focus-visible,
+.focus-shell summary:focus-visible,
 .room-sound :is(button, select, input):focus-visible {
-  outline-color: var(--room-accent);
+  outline: 2px solid var(--room-accent);
+  outline-offset: 3px;
 }
 
 .focus-shell .topbar {
   flex: none;
-  background: var(--room-glass-veil);
-  border-color: #ffffff1a;
-  box-shadow: inset 0 -1px 0 #ffffff0f;
-  backdrop-filter: var(--room-glass-blur-raised);
+  background: transparent;
+  border: 0;
 }
 
 .focus-shell .topbar-inner,
@@ -138,20 +148,58 @@
 }
 
 .focus-shell .topbar-inner {
-  height: 60px;
+  height: 76px;
   max-width: none;
+  justify-content: flex-end;
 }
 
-.focus-shell .brand-icon {
-  color: var(--room-accent);
-  background: #cbf1d219;
-  border: 1px solid #cbf1d247;
+.focus-shell .topbar :is(.focus-glass, .theme-button),
+.focus-shell .activity-trigger {
+  background: var(--room-glass-raised);
+  color: var(--room-text);
 }
 
-.focus-dock {
+.focus-shell .topbar :is(.focus-glass, .theme-button):is(:hover, [aria-expanded='true'], [aria-pressed='true']),
+.focus-shell .activity-trigger:hover,
+.room-activity[open] .activity-trigger {
+  background: var(--room-hover);
+}
+
+.focus-dock,
+.display-dock {
   display: flex;
   align-items: center;
   gap: 7px;
+}
+
+.focus-shell .header-actions {
+  gap: 18px;
+}
+
+.display-dock {
+  padding-inline: 18px;
+  border-inline: 1px solid var(--room-line-strong);
+}
+
+.focus-shell .topbar :is(.focus-glass, .theme-button) {
+  min-height: 40px;
+}
+
+.focus-shell .theme-button {
+  width: 40px;
+  height: 40px;
+}
+
+.focus-shell .topbar :is(.focus-dock, .display-dock) :is(.focus-glass, .theme-button) {
+  border-color: transparent;
+  background: #0a120e66;
+}
+
+.focus-shell
+  .topbar
+  :is(.focus-dock, .display-dock)
+  :is(.focus-glass, .theme-button):is(:hover, [aria-expanded='true'], [aria-pressed='true']) {
+  background: var(--room-hover);
 }
 
 .focus-glass,
@@ -188,14 +236,6 @@
   padding: 0;
 }
 
-.focus-dock button[aria-expanded='true'],
-.focus-dock button[aria-pressed='true'],
-.focus-dock .sound-active {
-  border-color: var(--room-line-strong);
-  background: #eef4ef1f;
-  color: var(--room-text);
-}
-
 .scene-trigger span {
   max-width: 13ch;
   overflow: hidden;
@@ -208,99 +248,52 @@
 }
 
 .focus-shell .workspace-layout {
-  display: grid;
+  display: flex;
   flex: 1;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 336px);
-  align-items: stretch;
-  gap: 24px;
-  min-height: 0;
-  padding-block: 20px max(22px, env(safe-area-inset-bottom));
+  align-items: flex-end;
+  padding-block: 16px max(22px, env(safe-area-inset-bottom));
 }
 
 .focus-main {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-height: 0;
-  min-width: 0;
-}
-
-/* 计时卡吃下剩余高度，底部区按内容高度固定，整页正好一屏。 */
-.focus-main .focus-session {
-  flex: 1 1 auto;
-  justify-content: center;
-}
-
-.focus-main > .room-activity {
-  flex: 0 0 auto;
-}
-
-/* 计时卡吸收多余空间，底部的待办与统计贴住内容底部。 */
-
-.room-sound {
-  min-width: 0;
-}
-
-.room-heading,
-.sound-heading {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 0;
-  margin: 0;
-}
-
-.room-heading {
-  text-shadow:
-    0 1px 2px #050b08cc,
-    0 2px 18px #050b08a8;
-}
-
-.room-heading h1 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: 0.18em;
-  /* 场景更透以后，标题直接压在照片上，靠描边阴影托住而不是加底板。 */
-  color: var(--room-text);
-  text-shadow:
-    0 1px 3px #050b08d9,
-    0 0 22px #050b0899;
-}
-
-.room-heading .room-date {
-  padding: 3px 9px;
-  border-radius: 7px;
-  background: var(--room-glass-veil);
-  box-shadow: inset 0 1px 0 #ffffff1f;
-  backdrop-filter: var(--room-glass-blur-raised);
-  color: var(--room-muted);
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  font-variant-numeric: tabular-nums;
+  display: grid;
+  grid-template-columns: minmax(0, 376px) 1fr;
+  align-items: end;
+  gap: 10px;
+  width: 100%;
 }
 
 .focus-session {
   display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 20px;
-  padding: 28px 24px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px 12px;
+  padding: 20px;
   border: 1px solid var(--room-line);
-  border-radius: var(--room-radius-lg);
-  background: var(--room-glass);
+  border-radius: var(--room-radius);
+  background: var(--room-glass-raised);
   box-shadow: var(--room-glass-edge), var(--room-glass-shadow);
   backdrop-filter: var(--room-glass-blur);
+}
+
+.focus-session--running .timer-options {
+  opacity: 0.7;
+}
+
+.focus-session--running .timer-options:focus-within {
+  opacity: 1;
+}
+
+.timer-options {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .timer-modes {
   display: flex;
   gap: 2px;
-  border-radius: 8px;
-  background: #050b0866;
 }
 
 .timer-modes button {
@@ -309,7 +302,7 @@
   align-items: center;
   justify-content: center;
   min-height: 30px;
-  padding: 4px 12px;
+  padding: 4px 8px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -326,9 +319,9 @@
 
 .timer-modes button::after {
   position: absolute;
-  right: 12px;
+  right: 8px;
   bottom: 0;
-  left: 12px;
+  left: 8px;
   height: 1px;
   background: currentColor;
   content: '';
@@ -346,51 +339,25 @@
 
 .timer-face {
   display: grid;
-  justify-items: center;
-  gap: 9px;
+  gap: 8px;
 }
 
 .timer-caption {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #050b0866;
   color: var(--room-muted);
   font-size: 12px;
-  letter-spacing: 0.16em;
-}
-
-.timer-caption::before {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-  content: '';
-}
-
-.timer-caption.is-running {
-  color: var(--room-accent);
-}
-
-.timer-caption.is-running::before {
-  animation: timer-pulse 2s ease-in-out infinite;
-}
-
-@keyframes timer-pulse {
-  50% {
-    opacity: 0.3;
-  }
 }
 
 .focus-clock {
-  font-size: clamp(64px, 7.4vw, 104px);
-  font-weight: 250;
+  font-size: 48px;
+  font-weight: 350;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.042em;
   line-height: 0.96;
-  text-shadow: 0 8px 44px #07100b85;
+  white-space: nowrap;
+}
+
+.focus-clock--long {
+  font-size: 40px;
 }
 
 .focus-duration {
@@ -398,9 +365,9 @@
   align-items: center;
   gap: 5px;
   min-height: 26px;
-  color: var(--room-dim);
+  color: var(--room-muted);
   font-size: 12px;
-  letter-spacing: 0.08em;
+  white-space: nowrap;
 }
 
 .focus-duration input {
@@ -419,40 +386,8 @@
   outline: none;
 }
 
-/* 计时圆环：同一个 conic 渐变画"剩余"和"已过"，再径向遮罩成 1.5px 细环。
-   一条渐变同时承担轨道与进度，几何天然对齐，不需要第二层 SVG 描边。 */
-.timer-ring {
-  position: relative;
-  display: grid;
-  width: min(100%, 320px, 34vh);
-  aspect-ratio: 1;
-  margin-block: 6px;
-  place-items: center;
-  border-radius: 50%;
-}
-
-.timer-ring::before {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(from 0turn, var(--room-accent) calc(var(--timer-progress) * 1turn), #ffffff26 0);
-  content: '';
-  -webkit-mask: radial-gradient(farthest-side, #0000 calc(100% - 1.5px), #000 0);
-  mask: radial-gradient(farthest-side, #0000 calc(100% - 1.5px), #000 0);
-}
-
-.timer-ring .focus-clock {
-  position: relative;
-}
-
-/* 圆环内不再重复一条细进度线。 */
-.timer-ring .timer-progress {
-  display: none;
-}
-
-/* 进度条始终可见：一条 2px 细线，替代原来的圆环。 */
 .timer-progress {
-  width: min(100%, 360px);
+  grid-column: 1 / -1;
   height: 2px;
   border-radius: 999px;
   background: linear-gradient(to right, var(--room-accent) calc(var(--timer-progress) * 100%), #ffffff26 0);
@@ -461,41 +396,44 @@
 .focus-timer-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .focus-start {
   display: inline-flex;
-  min-height: 42px;
-  min-width: 148px;
+  min-width: 104px;
+  min-height: 40px;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 7px 20px;
+  gap: 5px;
+  padding: 8px 12px;
   border: 0;
   border-radius: 9px;
-  background: var(--room-accent);
+  background: #eee9dc;
   color: var(--room-accent-ink);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
 .focus-start:hover {
-  background: #eaf7ec;
+  background: #fffaf0;
 }
 
 .focus-icon {
-  width: 42px;
-  min-height: 42px;
+  width: 36px;
+  min-height: 36px;
   padding: 0;
   border-radius: 50%;
+  border-color: transparent;
+  background: transparent;
+  color: var(--room-dim);
 }
 
 .timer-goal {
+  grid-column: 1 / -1;
   display: flex;
-  width: min(100%, 340px);
-  min-height: 34px;
+  min-height: 40px;
   align-items: center;
   gap: 9px;
   padding-inline: 2px;
@@ -537,16 +475,39 @@
 }
 
 .room-activity {
+  position: relative;
+  justify-self: end;
+}
+
+.activity-trigger {
+  cursor: pointer;
+  list-style: none;
+}
+
+.activity-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.room-activity[open] .activity-trigger svg:last-child {
+  transform: rotate(180deg);
+}
+
+.activity-panel {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  bottom: calc(100% + 8px);
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-  align-items: start;
-  gap: 26px;
-  padding: 16px 18px;
-  border: 1px solid var(--room-line);
+  gap: 14px;
+  width: min(330px, calc(100vw - 28px));
+  max-height: max(150px, calc(100svh - 130px));
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--room-line-strong);
   border-radius: var(--room-radius);
-  background: var(--room-glass);
-  box-shadow: var(--room-glass-edge), var(--room-glass-shadow);
-  backdrop-filter: var(--room-glass-blur);
+  background: var(--room-glass-raised);
+  box-shadow: var(--room-glass-edge), var(--room-glass-shadow-raised);
+  backdrop-filter: var(--room-glass-blur-raised);
 }
 
 /* 卡片降级为透明容器：无玻璃、无投影、无描边，只靠留白与细线分组。 */
@@ -561,8 +522,8 @@
 }
 
 .stats-card {
-  padding-left: 24px;
-  border-left: 1px solid var(--room-line);
+  padding-top: 12px;
+  border-top: 1px solid var(--room-line);
 }
 
 .room-card-heading {
@@ -650,6 +611,30 @@
   overflow-wrap: anywhere;
 }
 
+.task-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  padding-block: 8px;
+}
+
+.task-use-goal {
+  justify-self: start;
+  min-height: 32px;
+  margin-left: 21px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--room-muted);
+  font-size: 12px;
+}
+
+.task-use-goal:hover:not(:disabled) {
+  color: var(--room-text);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 .task-list input {
   flex: none;
   margin: 0;
@@ -687,14 +672,14 @@
 .stats-values dd {
   margin: 0;
   color: var(--room-text);
-  font-size: 34px;
-  font-weight: 300;
+  font-size: 24px;
+  font-weight: 350;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
-.room-sound:not(.sound-in-workspace) {
+.room-sound {
   position: fixed;
   z-index: 2;
   inset: 70px 22px auto auto;
@@ -709,28 +694,11 @@
   backdrop-filter: var(--room-glass-blur-raised);
 }
 
-/* 工作区内：与左侧同高的静默侧栏，只有一条左分隔线。 */
-.room-sound.sound-in-workspace {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-height: 0;
-  overflow: auto;
-  padding: 16px 16px 18px;
-  border: 1px solid var(--room-line);
-  border-radius: var(--room-radius-lg);
-  background: var(--room-glass);
-  box-shadow: var(--room-glass-edge), var(--room-glass-shadow);
-  backdrop-filter: var(--room-glass-blur);
-  text-shadow: 0 1px 3px #050b08cc;
-}
-
 .sound-heading {
-  flex: none;
-  padding-inline: 0;
-}
-
-.room-sound:not(.sound-in-workspace) .sound-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   min-height: 28px;
   margin-bottom: 12px;
 }
@@ -738,10 +706,6 @@
 .sound-bar {
   display: grid;
   gap: 18px;
-}
-
-.sound-in-workspace .sound-bar {
-  gap: 22px;
 }
 
 .sound-bar .room-card + .room-card {
@@ -844,8 +808,8 @@
 }
 
 .track-controls .music-play {
-  width: 42px;
-  min-height: 42px;
+  width: 36px;
+  min-height: 36px;
   border: 0;
   background: var(--room-accent);
   color: var(--room-accent-ink);
@@ -931,9 +895,9 @@
   --focus: var(--room-accent);
   position: fixed;
   z-index: 3;
-  inset: 76px auto auto 50%;
+  inset: 86px auto auto 50%;
   width: min(900px, calc(100% - 32px));
-  max-height: calc(100svh - 96px);
+  max-height: calc(100svh - 106px);
   overflow: auto;
   padding: 16px;
   transform: translateX(-50%);
@@ -966,22 +930,29 @@
   background: linear-gradient(180deg, #101c1775, transparent 24%, transparent 68%, #101915a6);
 }
 
-.room-immersive .topbar {
-  background: #101c172b;
-  backdrop-filter: none;
-}
-
-.room-immersive .workspace-layout {
-  display: flex;
-  align-items: flex-end;
-}
-
 .room-immersive .focus-main {
-  width: min(100%, 264px);
+  grid-template-columns: minmax(0, 376px);
 }
 
-.visually-hidden,
-.room-immersive .room-heading {
+.room-immersive .focus-clock {
+  font-size: 64px;
+}
+
+.room-immersive .focus-session {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+.room-immersive .focus-timer-actions {
+  justify-content: flex-start;
+}
+
+.room-immersive .display-dock {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -993,99 +964,11 @@
   white-space: nowrap;
 }
 
-.room-immersive :is(.room-activity, .timer-modes, .timer-goal, .focus-duration, .course-entry, .theme-button) {
+.room-immersive :is(.room-activity, .timer-options, .timer-goal, .course-entry, .theme-button) {
   display: none;
-}
-
-.room-immersive .focus-session {
-  justify-items: stretch;
-  gap: 10px;
-  padding: 15px;
-  border-radius: var(--room-radius);
-  background: var(--room-glass-raised);
-  box-shadow: var(--room-glass-edge), var(--room-glass-shadow-raised);
-  backdrop-filter: var(--room-glass-blur-raised);
-}
-
-.room-immersive .timer-face {
-  justify-items: start;
-  gap: 4px;
-}
-
-/* 沉浸模式侧栏窄，圆环退回一条细进度线，把高度让给控制条。 */
-.room-immersive .timer-ring {
-  display: contents;
-}
-
-.room-immersive .timer-ring::before {
-  display: none;
-}
-
-.room-immersive .timer-ring .timer-progress {
-  display: block;
-}
-
-.room-immersive .focus-clock {
-  font-size: 46px;
-  letter-spacing: -0.03em;
-}
-
-.room-immersive .timer-progress {
-  width: 100%;
-  margin-block: 2px;
-}
-
-.room-immersive .focus-start {
-  min-height: 37px;
-  min-width: 0;
-  flex: 1;
-}
-
-.room-immersive .focus-icon {
-  width: 37px;
-  min-height: 37px;
 }
 
 @media (max-width: 980px) {
-  .focus-shell {
-    height: auto;
-    overflow: visible;
-  }
-
-  .focus-shell .workspace-layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
-  }
-
-  .focus-main .focus-session {
-    flex: 0 0 auto;
-  }
-
-  .focus-session {
-    padding: 22px 20px;
-  }
-
-  .room-sound.sound-in-workspace {
-    padding: 18px 0 0;
-    border-top: 1px solid var(--room-line);
-    border-left: 0;
-  }
-
-  .sound-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-    gap: 24px;
-  }
-
-  .sound-bar .room-card + .room-card {
-    padding-top: 0;
-    border-top: 0;
-  }
-
-  .room-sound:not(.sound-in-workspace) .sound-bar {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .focus-shell .topbar-inner,
   .focus-shell .workspace-layout {
     padding-inline: 20px;
@@ -1094,7 +977,7 @@
 
 @media (max-width: 570px) {
   .focus-shell .topbar-inner {
-    height: 54px;
+    height: 64px;
   }
 
   .focus-shell .topbar-inner,
@@ -1102,38 +985,19 @@
     padding-inline: 14px;
   }
 
-  .focus-shell .workspace-layout {
-    gap: 16px;
-    padding-block: 16px 22px;
-  }
-
-  .focus-shell .brand {
-    gap: 6px;
-    font-size: 16px;
-  }
-
-  .focus-shell .brand-icon,
   .focus-dock .focus-glass,
+  .display-dock .focus-glass,
   .focus-shell .theme-button {
-    width: 34px;
-    height: 34px;
-    min-height: 34px;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
     padding: 0;
   }
 
   .focus-shell .header-actions,
-  .focus-dock {
+  .focus-dock,
+  .display-dock {
     gap: 4px;
-  }
-
-  .focus-shell .topbar-inner {
-    gap: 8px;
-  }
-
-  .focus-shell .header-leading {
-    min-width: 0;
-    flex: 0 1 auto;
-    overflow: hidden;
   }
 
   .focus-shell .header-actions {
@@ -1141,91 +1005,83 @@
   }
 
   .focus-dock button span,
+  .display-dock button span,
   .course-entry svg {
     display: none;
   }
 
-  .focus-dock .focus-glass {
-    width: 32px;
-    height: 32px;
-    min-height: 32px;
-    padding: 0;
+  .display-dock {
+    padding-inline: 4px;
   }
 
   .course-entry {
-    width: 32px;
-    min-height: 32px;
+    width: 44px;
+    min-height: 40px;
     padding: 0;
     font-size: 0;
     justify-content: center;
   }
 
-  /* 用书签图标替代文字，窄屏也不再挤压顶栏。 */
+  /* 窄屏保留简短文字入口，避免只靠图标识别笔记。 */
   .course-entry::before {
     font-size: 13px;
     content: '笔记';
     letter-spacing: 0.04em;
   }
 
-  .room-heading {
-    align-items: center;
-  }
-
-  .room-heading h1 {
-    font-size: 19px;
-  }
-
-  .room-heading .room-date {
-    flex: none;
-    padding: 2px 7px;
-    font-size: 11px;
-    white-space: nowrap;
+  .focus-main {
+    grid-template-columns: minmax(0, 376px);
+    gap: 16px;
   }
 
   .focus-session {
-    gap: 16px;
-    padding: 20px 16px;
+    padding: 16px;
+    gap: 14px 8px;
   }
 
   .focus-clock {
-    font-size: clamp(56px, 17vw, 74px);
+    font-size: 40px;
   }
 
-  .timer-progress {
-    width: 100%;
+  .focus-clock--long {
+    font-size: 32px;
+  }
+
+  .focus-timer-actions {
+    gap: 4px;
   }
 
   .focus-start {
-    min-height: 40px;
-    min-width: 132px;
+    padding-inline: 9px;
   }
 
-  .room-activity {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-  }
-
-  .stats-card {
-    padding-top: 14px;
-    padding-left: 0;
-    border-top: 1px solid var(--room-line);
-    border-left: 0;
-  }
-
-  .sound-bar {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
-  }
-
-  .sound-bar .room-card + .room-card {
-    padding-top: 16px;
-    border-top: 1px solid var(--room-line);
+  .timer-modes button {
+    padding-inline: 5px;
   }
 
   .room-tools,
-  .room-sound:not(.sound-in-workspace) {
-    top: 64px;
-    max-height: calc(100svh - 80px);
+  .room-sound {
+    top: 72px;
+    max-height: calc(100svh - 88px);
+  }
+}
+
+@media (max-height: 420px) and (min-width: 571px) {
+  .focus-shell .workspace-layout {
+    padding-block: 8px 12px;
+  }
+
+  .focus-main {
+    grid-template-columns: minmax(0, 284px) 1fr;
+  }
+
+  .focus-session {
+    gap: 4px 8px;
+    padding: 8px 10px;
+  }
+
+  .focus-clock {
+    font-size: 32px;
   }
 }
 

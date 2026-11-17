@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, ArrowUpRight, BookOpen, Headphones, Images, Maximize, Minimize, Moon, Sun, X } from '@lucide/vue'
+import { ArrowLeft, BookOpen, Headphones, Images, Maximize, Minimize, Moon, Sun, X } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
@@ -25,7 +25,6 @@ const themePanel = ref<InstanceType<typeof ThemePanel>>()
 const immersiveButton = ref<HTMLButtonElement>()
 const immersive = ref(false)
 const inCourses = computed(() => route.name === 'courses')
-const soundInWorkspace = computed(() => !inCourses.value && !immersive.value)
 let toolTrigger: HTMLElement | undefined
 let nativeFullscreen = false
 
@@ -168,17 +167,17 @@ function escapeTool(event: KeyboardEvent) {
 
     <header class="topbar">
       <div class="topbar-inner">
-        <div class="header-leading">
+        <div v-if="inCourses" class="header-leading">
           <RouterLink to="/" class="brand" aria-label="知径自习室">
             <span class="brand-icon"><BookOpen :size="19" :stroke-width="1.8" aria-hidden="true" /></span>
             <span>知径</span>
           </RouterLink>
-          <RouterLink v-if="inCourses" to="/" class="quiet-button back-to-room">
+          <RouterLink to="/" class="quiet-button back-to-room">
             <ArrowLeft :size="16" aria-hidden="true" /> 返回自习室
           </RouterLink>
         </div>
         <nav class="header-actions" aria-label="页面导航">
-          <div v-if="!inCourses" class="focus-dock" role="group" aria-label="自习室设置">
+          <div v-if="!inCourses" class="focus-dock" role="group" aria-label="环境设置">
             <button
               type="button"
               class="focus-glass scene-trigger"
@@ -194,14 +193,15 @@ function escapeTool(event: KeyboardEvent) {
               type="button"
               class="focus-glass sound-trigger"
               aria-controls="room-sound"
-              :aria-expanded="immersive ? tool === 'sound' : undefined"
-              :class="{ 'sound-active': tool === 'sound' }"
+              :aria-expanded="tool === 'sound'"
               aria-label="声音"
               title="声音"
               @click="toggleTool($event, 'sound')"
             >
               <Headphones :size="17" aria-hidden="true" /> <span>声音</span>
             </button>
+          </div>
+          <div v-if="!inCourses" class="display-dock" role="group" aria-label="显示设置">
             <button
               ref="immersiveButton"
               type="button"
@@ -214,6 +214,15 @@ function escapeTool(event: KeyboardEvent) {
               <Minimize v-if="immersive" :size="17" aria-hidden="true" />
               <Maximize v-else :size="17" aria-hidden="true" />
               <span>{{ immersive ? '退出沉浸' : '沉浸模式' }}</span>
+            </button>
+            <button
+              type="button"
+              class="icon-button theme-button"
+              :aria-label="dark ? '切换到浅色模式' : '切换到深色模式'"
+              :title="dark ? '切换到浅色模式' : '切换到深色模式'"
+              @click="toggleTheme"
+            >
+              <Sun v-if="dark" :size="18" aria-hidden="true" /><Moon v-else :size="18" aria-hidden="true" />
             </button>
           </div>
           <button
@@ -229,9 +238,10 @@ function escapeTool(event: KeyboardEvent) {
             <Headphones :size="18" aria-hidden="true" />
           </button>
           <RouterLink v-else to="/courses" class="course-entry focus-glass">
-            看课笔记 <ArrowUpRight :size="16" aria-hidden="true" />
+            <BookOpen :size="16" aria-hidden="true" /> 看课笔记
           </RouterLink>
           <button
+            v-if="inCourses"
             type="button"
             class="icon-button theme-button"
             :aria-label="dark ? '切换到浅色模式' : '切换到深色模式'"
@@ -251,22 +261,10 @@ function escapeTool(event: KeyboardEvent) {
         </KeepAlive>
       </RouterView>
 
-      <aside
-        id="room-sound"
-        v-show="soundInWorkspace || tool === 'sound'"
-        class="room-sound"
-        :class="{ 'sound-in-workspace': soundInWorkspace }"
-        aria-labelledby="sound-title"
-      >
+      <aside id="room-sound" v-show="tool === 'sound'" class="room-sound" aria-labelledby="sound-title">
         <div class="sound-heading">
           <h2 id="sound-title" ref="soundTitle" tabindex="-1"><Headphones :size="17" aria-hidden="true" /> 声音</h2>
-          <button
-            v-if="!soundInWorkspace"
-            type="button"
-            class="room-icon"
-            aria-label="关闭声音设置"
-            @click="closeTool()"
-          >
+          <button type="button" class="room-icon" aria-label="关闭声音设置" @click="closeTool()">
             <X :size="17" aria-hidden="true" />
           </button>
         </div>
