@@ -149,8 +149,10 @@ onUnmounted(() => window.clearInterval(interval))
     </div>
     <div class="timer-face" :style="{ '--timer-progress': progress }">
       <span class="timer-caption" :class="{ 'is-running': running }">{{ status }}</span>
-      <div class="focus-clock" role="timer" :aria-label="rest ? '休息剩余时间' : '专注剩余时间'">{{ time }}</div>
-      <div class="timer-progress" aria-hidden="true"></div>
+      <div class="timer-ring">
+        <div class="focus-clock" role="timer" :aria-label="rest ? '休息剩余时间' : '专注剩余时间'">{{ time }}</div>
+        <div class="timer-progress" aria-hidden="true"></div>
+      </div>
       <label class="focus-duration">
         <input
           type="number"

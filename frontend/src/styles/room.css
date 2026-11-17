@@ -212,7 +212,6 @@
 
 /* 计时卡吸收多余空间，底部的待办与统计贴住内容底部。 */
 
-
 .room-sound {
   min-width: 0;
 }
@@ -380,6 +379,37 @@
 .focus-duration input:focus-visible {
   border-bottom-color: var(--room-accent);
   outline: none;
+}
+
+/* 计时圆环：同一个 conic 渐变画"剩余"和"已过"，再径向遮罩成 1.5px 细环。
+   一条渐变同时承担轨道与进度，几何天然对齐，不需要第二层 SVG 描边。 */
+.timer-ring {
+  position: relative;
+  display: grid;
+  width: min(100%, 320px, 34vh);
+  aspect-ratio: 1;
+  margin-block: 6px;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.timer-ring::before {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0turn, var(--room-accent) calc(var(--timer-progress) * 1turn), #ffffff26 0);
+  content: '';
+  -webkit-mask: radial-gradient(farthest-side, #0000 calc(100% - 1.5px), #000 0);
+  mask: radial-gradient(farthest-side, #0000 calc(100% - 1.5px), #000 0);
+}
+
+.timer-ring .focus-clock {
+  position: relative;
+}
+
+/* 圆环内不再重复一条细进度线。 */
+.timer-ring .timer-progress {
+  display: none;
 }
 
 /* 进度条始终可见：一条 2px 细线，替代原来的圆环。 */
@@ -922,8 +952,7 @@
   white-space: nowrap;
 }
 
-.room-immersive
-  :is(.room-activity, .timer-modes, .timer-goal, .focus-duration, .course-entry, .theme-button) {
+.room-immersive :is(.room-activity, .timer-modes, .timer-goal, .focus-duration, .course-entry, .theme-button) {
   display: none;
 }
 
@@ -939,6 +968,19 @@
 .room-immersive .timer-face {
   justify-items: start;
   gap: 4px;
+}
+
+/* 沉浸模式侧栏窄，圆环退回一条细进度线，把高度让给控制条。 */
+.room-immersive .timer-ring {
+  display: contents;
+}
+
+.room-immersive .timer-ring::before {
+  display: none;
+}
+
+.room-immersive .timer-ring .timer-progress {
+  display: block;
 }
 
 .room-immersive .focus-clock {
@@ -1067,8 +1109,6 @@
     min-height: 32px;
     padding: 0;
   }
-
-
 
   .course-entry {
     width: 32px;
