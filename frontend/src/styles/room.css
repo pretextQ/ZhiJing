@@ -1,4 +1,6 @@
+/* 自习室与看课页共用同一套房间令牌，任一外壳挂上即拥有玻璃质感。 */
 .focus-shell,
+.course-shell,
 .room-sound {
   --room-text: #f2f0e9;
   --room-muted: #b9c3ba;
@@ -27,7 +29,7 @@
   color-scheme: dark;
 }
 
-:root[data-theme='dark'] :is(.focus-shell, .room-sound) {
+:root[data-theme='dark'] :is(.focus-shell, .course-shell, .room-sound) {
   --room-line: #ffffff1f;
   --room-line-strong: #ffffff33;
   --room-control: #0f1712d6;

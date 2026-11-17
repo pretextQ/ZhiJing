@@ -79,7 +79,14 @@ describe('App layout shell', () => {
     expect(wrapper.get('#course-page-title').text()).toBe('看课笔记')
     expect(document.activeElement?.id).toBe('course-page-title')
     expect(wrapper.get('.back-to-room').attributes('href')).toBe('/')
-    expect(wrapper.find('.focus-backdrop').exists()).toBe(false)
+    // 看课页继承当前场景作背景，但不再带自习室的动效类。
+    expect(wrapper.find('.focus-backdrop').exists()).toBe(true)
+    expect(
+      wrapper
+        .get('.focus-backdrop')
+        .classes()
+        .some((name) => name.startsWith('motion-')),
+    ).toBe(false)
 
     await wrapper.get('.back-to-room').trigger('click')
     await flushPromises()
@@ -94,7 +101,10 @@ describe('App layout shell', () => {
   it('opens /courses directly with the courses shell', async () => {
     const { wrapper } = await mountApp('/courses')
     expect(document.title).toBe('看课笔记 · 知径')
-    expect(wrapper.find('.focus-backdrop').exists()).toBe(false)
+    expect(wrapper.get('.app-shell').classes()).toContain('course-shell')
+    // 看课页也铺当前场景，并使用同一套玻璃令牌。
+    expect(wrapper.find('.focus-backdrop').exists()).toBe(true)
+    expect(wrapper.get('.focus-backdrop').attributes('style')).toContain('forest')
     expect(wrapper.find('#course-page-title').exists()).toBe(true)
     expect(wrapper.get('.back-to-room').attributes('href')).toBe('/')
   })

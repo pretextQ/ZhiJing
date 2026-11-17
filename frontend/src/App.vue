@@ -137,17 +137,20 @@ function escapeTool(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div ref="shell" class="app-shell" :class="{ 'focus-shell': !inCourses, 'room-immersive': immersive }">
+  <div
+    ref="shell"
+    class="app-shell"
+    :class="{ 'focus-shell': !inCourses, 'course-shell': inCourses, 'room-immersive': immersive }"
+  >
     <div
-      v-if="!inCourses"
       class="focus-backdrop"
-      :class="motionClass"
-      :data-previewing="preview ? 'true' : undefined"
+      :class="inCourses ? undefined : motionClass"
+      :data-previewing="preview && !inCourses ? 'true' : undefined"
       :style="{ backgroundImage: 'url(' + viewTheme.backgroundUrl + ')' }"
       aria-hidden="true"
     >
       <video
-        v-if="sceneVideoUrl"
+        v-if="sceneVideoUrl && !inCourses"
         :key="sceneVideoUrl"
         class="scene-video"
         :src="sceneVideoUrl"
