@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { Coffee, Pause, Play, RotateCcw, Target, Timer, Trees } from '@lucide/vue'
+import { Pause, Play, RotateCcw, Target } from '@lucide/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { readLocal, writeLocal } from '../preferences'
 import { formatTime } from '../study'
 
 const presets = [
-  { id: 'focus', label: '专注', minutes: 25, icon: Timer },
-  { id: 'short', label: '短休息', minutes: 5, icon: Coffee },
-  { id: 'long', label: '长休息', minutes: 15, icon: Trees },
+  { id: 'focus', label: '专注', minutes: 25 },
+  { id: 'short', label: '短休息', minutes: 5 },
+  { id: 'long', label: '长休息', minutes: 15 },
 ] as const
 type Mode = (typeof presets)[number]['id']
 
@@ -144,11 +144,10 @@ onUnmounted(() => window.clearInterval(interval))
         :disabled="running && mode !== preset.id"
         @click="selectMode(preset.id)"
       >
-        <component :is="preset.icon" :size="15" aria-hidden="true" /> {{ preset.label }}
+        {{ preset.label }}
       </button>
     </div>
     <div class="timer-face" :style="{ '--timer-progress': progress }">
-      <div class="timer-ring" aria-hidden="true"></div>
       <span class="timer-caption" :class="{ 'is-running': running }">{{ status }}</span>
       <div class="focus-clock" role="timer" :aria-label="rest ? '休息剩余时间' : '专注剩余时间'">{{ time }}</div>
       <div class="timer-progress" aria-hidden="true"></div>

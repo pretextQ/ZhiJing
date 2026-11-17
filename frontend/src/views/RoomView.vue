@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CalendarDays, ChartNoAxesColumnIncreasing, ClipboardList, Plus, X } from '@lucide/vue'
+import { Plus, X } from '@lucide/vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import FocusTimer from '../components/FocusTimer.vue'
 import { readLocal, writeLocal } from '../preferences'
@@ -72,7 +72,7 @@ onUnmounted(() => window.clearInterval(dayInterval))
   <main class="focus-main">
     <header class="room-heading">
       <h1 id="room-title" tabindex="-1">自习室</h1>
-      <span><CalendarDays :size="15" aria-hidden="true" /> {{ todayLabel }}</span>
+      <span class="room-date">{{ todayLabel }}</span>
     </header>
 
     <FocusTimer @complete="recordFocus" />
@@ -80,7 +80,7 @@ onUnmounted(() => window.clearInterval(dayInterval))
     <div class="room-activity">
       <section class="room-card task-card" aria-labelledby="tasks-title">
         <div class="room-card-heading">
-          <h2 id="tasks-title"><ClipboardList :size="17" aria-hidden="true" /> 学习待办</h2>
+          <h2 id="tasks-title">学习待办</h2>
           <span v-if="tasks.length" class="room-card-detail">{{ done }} / {{ tasks.length }} 已完成</span>
         </div>
         <ul v-if="tasks.length" class="task-list">
@@ -111,7 +111,7 @@ onUnmounted(() => window.clearInterval(dayInterval))
 
       <section class="room-card stats-card" aria-labelledby="stats-title">
         <div class="room-card-heading">
-          <h2 id="stats-title"><ChartNoAxesColumnIncreasing :size="17" aria-hidden="true" /> 今日专注</h2>
+          <h2 id="stats-title">今日专注</h2>
         </div>
         <dl class="stats-values">
           <div>
