@@ -224,3 +224,41 @@ python dev/verify_themes_docker.py                     PASS（导入/重建/导�
 - 本机备份：`uv run --locked --no-sync python dev/backup.py [--output ...]`；Docker 内用 `docker compose exec -e PYTHONPATH=/app/backend zhijing python -m zhijing.backup`。
 - 修改接口后：`uv run --locked --no-sync python dev/export_openapi.py` 然后 `npm.cmd --prefix frontend run gen:api`，CI 会校验快照未漂移。
 - `dev/backup.py` 不进入 Docker 镜像；容器内使用 `python -m zhijing.backup`。
+
+## 自习室首页重做与单人基调实施记录（2026-11-17）
+
+在提交 `a8c2546` 之后的主题包与基础设施之上，按新的[项目基调](project-charter.md)重做自习室首页，并据此重做外部调研。
+
+### 交付内容
+
+- 基调与调研：[project-charter.md](project-charter.md) 确立单人自用定位与第 4.3 节非目标表；[online-study-room-solo-research.md](online-study-room-solo-research.md) 重做调研，前两份多人方向调研（[布局与设计](online-study-room-research.md)、[海外产品](online-study-room-overseas-products.md)）在文首标注作废，仅作资料留档。
+- 首页工作台：[RoomView.vue](../frontend/src/views/RoomView.vue)、[FocusTimer.vue](../frontend/src/components/FocusTimer.vue)、[App.vue](../frontend/src/App.vue) 与 [styles/room.css](../frontend/src/styles/room.css) 收敛为一屏沉浸版式：场景背景铺满、计时器居中、待办与今日专注在底部、声音面板在右侧；沉浸模式保留小计时器与场景 / 声音入口。
+- 场景动效：[RainWindow.vue](../frontend/src/components/RainWindow.vue) 为雨窗增加分层雨滴，仍受「背景动效」开关与系统减少动效约束。
+- 计时圆环：[styles/room.css](../frontend/src/styles/room.css) 用单层 conic 渐变加径向遮罩画出 1.5px 细环，轨道与进度共用一条渐变；沉浸侧栏过窄时回落为细进度线，没有逐秒动画。
+
+### 实际验证
+
+```text
+uv run --locked --no-sync ruff check .                 All checks passed
+uv run --locked --no-sync pytest -q                    135 passed, 1 warning
+npm.cmd --prefix frontend run lint                     eslint 0 error
+npm.cmd --prefix frontend run format:check             All matched files use Prettier code style
+npm.cmd --prefix frontend run test:unit                35 passed（5 个文件）
+npm.cmd --prefix frontend run build                    vue-tsc --noEmit 与 vite build 通过
+$env:PYTHONPATH=(Resolve-Path .dev/browser-deps).Path
+uv run --locked --no-sync python dev/verify_themes.py
+  PASS：六款内置、雨滴动效、动效开关与减少动效、预览/应用/刷新、键盘、ZIP 导入/重复/无效包、
+        视频播放、重命名/导出、限制提示、320px、深色、主题环境音、计时与课程草稿往返、删除回退
+uv run --locked --no-sync python dev/verify_themes_docker.py
+  PASS：含背景、视频与环境音的合成包导入，重命名与导出，重建容器后同一数据卷仍可读，
+        无效包 422，删除后主题库为空，结束执行 down -v
+docker compose up -d --wait
+  重建本机容器后，18119 提供的 index/css 与仓库构建产物哈希一致，样式含 .timer-ring 与 conic-gradient
+```
+
+### 待验证与后续
+
+- 单人调研第 9 节列出的五件可立即做的事，目前只落地「计时器去掉逐秒动画」一项；四轮后自动长休息、时长三档（25/5、50/10、10/3）、环境音按功能分类、环境音 300–800 ms 淡入均未实现。
+- 主题库排序与搜索、真实摄影素材替换、动态背景视频转码仍在范围外。
+- 旧 `zhijing` 容器需要更新时，在仓库根目录执行 `docker compose up -d --build`。
+
